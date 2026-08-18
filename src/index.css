@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Palette — vert forêt profond + doré miel, fond crème/brume */
+  --color-forest-950: #0a1f14;
+  --color-forest-800: #14432b;
+  --color-forest-700: #1c5638;
+  --color-forest-600: #256b46;
+  --color-forest-100: #dfeade;
+
+  --color-honey-600: #c9911f;
+  --color-honey-500: #e3a83b;
+  --color-honey-400: #edc272;
+  --color-honey-100: #fbead0;
+
+  --color-cream-50: #fbf9f4;
+  --color-mist-100: #eaf2e9;
+  --color-ink-900: #16211b;
+
+  --font-display: 'Fraunces', ui-serif, serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-ink-900);
+    background:
+      radial-gradient(circle at 10% -10%, var(--color-mist-100) 0%, transparent 45%),
+      radial-gradient(circle at 100% 0%, var(--color-honey-100) 0%, transparent 40%),
+      var(--color-cream-50);
+    min-height: 100vh;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: color-mix(in srgb, white 72%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid color-mix(in srgb, white 60%, var(--color-forest-100));
+    box-shadow: 0 8px 30px -12px rgba(20, 67, 43, 0.18);
+  }
+}
