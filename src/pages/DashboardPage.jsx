@@ -71,10 +71,12 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto">
         {/* En-tête */}
         <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <span className="font-display font-semibold text-forest-800 text-lg">izigreen</span>
-            <span className="text-honey-500 text-lg leading-none">◆</span>
-            <span className="font-display font-medium text-ink-900 text-lg ml-2">Suivi des ruches</span>
+          <div className="flex items-center gap-3">
+            <span className="relative inline-block font-bold text-forest-800 text-lg">
+              izigreen
+              <CheckBadge />
+            </span>
+            <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="flex items-center gap-1.5 text-ink-900/60">
@@ -97,7 +99,7 @@ export default function DashboardPage() {
 
         <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display text-3xl sm:text-4xl font-semibold text-ink-900">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-ink-900">
               Vos ruchers, en un coup d'œil
             </h1>
             <p className="text-ink-900/50 mt-1.5">
@@ -171,19 +173,19 @@ export default function DashboardPage() {
         {/* Tableau */}
         <div className="glass-card rounded-3xl overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4">
-            <div className="flex gap-1 bg-forest-100/50 rounded-xl p-1">
+            <div className="flex items-center gap-6">
               {ONGLETS_STATUT.map((onglet) => (
                 <button
                   key={onglet.id}
                   onClick={() => setStatutFiltre(onglet.id)}
-                  className={`relative px-4 py-1.5 text-sm font-medium rounded-lg transition ${
+                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition ${
                     statutFiltre === onglet.id ? 'text-white' : 'text-ink-900/60 hover:text-ink-900'
                   }`}
                 >
                   {statutFiltre === onglet.id && (
                     <motion.span
                       layoutId="onglet-actif"
-                      className="absolute inset-0 bg-forest-800 rounded-lg"
+                      className="absolute inset-0 bg-forest-800 rounded-full"
                       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                     />
                   )}
@@ -270,6 +272,14 @@ export default function DashboardPage() {
   )
 }
 
+function CheckBadge() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" className="absolute -top-1 -right-3.5 fill-honey-500">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12.5l2.5 2.5L16 9" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 function HiveIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>

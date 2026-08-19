@@ -32,11 +32,16 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: 'easeOut' }}
         className="glass-card w-full max-w-sm rounded-3xl px-8 py-10"
       >
-        <div className="flex items-center gap-2 mb-1">
-          <span className="font-display font-semibold text-forest-800 text-lg">izigreen</span>
-          <span className="text-honey-500 text-lg leading-none">◆</span>
+        <div className="mb-1">
+          <span className="relative inline-block font-bold text-forest-800 text-lg">
+            izigreen
+            <svg width="12" height="12" viewBox="0 0 24 24" className="absolute -top-1 -right-3 fill-honey-500">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 12.5l2.5 2.5L16 9" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         </div>
-        <h1 className="font-display text-2xl font-semibold text-ink-900 mb-1">Suivi des ruches</h1>
+        <h1 className="text-2xl font-extrabold text-ink-900 mb-1">Suivi des ruches</h1>
         <p className="text-sm text-ink-900/60 mb-8">
           Accès réservé à l'équipe IziGreen.
         </p>
