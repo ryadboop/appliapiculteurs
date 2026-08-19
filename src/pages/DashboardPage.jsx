@@ -156,7 +156,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPIs */}
-        <div className={`grid gap-4 mb-8 ${isAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className={`grid gap-3 mb-8 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <KpiCard icon={<HiveIcon className="w-5 h-5" />} label="Ruches installées" sublabel={`${ruchersDeLaSaison.length} rucher${ruchersDeLaSaison.length > 1 ? 's' : ''} suivi${ruchersDeLaSaison.length > 1 ? 's' : ''}`}>
             <AnimatedNumber value={ruchersDeLaSaison.length} />
           </KpiCard>
