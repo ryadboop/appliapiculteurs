@@ -13,7 +13,7 @@ function archiveToCsv(year, hives) {
     h.site,
     h.region,
     placementLabel[h.placement],
-    h.beekeeper ?? '',
+    h.beekeeperName ?? '',
     String(h.hiveCount),
     String(h.revenue ?? ''),
     h.startDate,

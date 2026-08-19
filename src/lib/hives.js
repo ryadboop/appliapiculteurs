@@ -55,7 +55,6 @@ export const REGIONS = [
 
 export const FAREINS_SITE = 'Fareins (01)'
 export const FAREINS_REGION = 'Auvergne-Rhône-Alpes'
-export const FAREINS_BEEKEEPER = 'Dominique Parriaud'
 
 /** Prix public d'une ruche : 1 440 € HT / an. */
 export const PRICE_PER_HIVE = 1440

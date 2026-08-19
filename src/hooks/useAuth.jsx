@@ -6,25 +6,23 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [myBeekeeperId, setMyBeekeeperId] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const loadRole = useCallback(async (userId) => {
     if (!userId) {
       setIsAdmin(false)
+      setMyBeekeeperId(null)
       return
     }
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .maybeSingle()
-    if (error) {
-      console.error('Impossible de vérifier le rôle :', error.message)
-      setIsAdmin(false)
-      return
-    }
-    setIsAdmin(Boolean(data))
+    const [{ data: roleRow, error: roleError }, { data: beekeeperRow, error: beekeeperError }] = await Promise.all([
+      supabase.from('user_roles').select('role').eq('user_id', userId).eq('role', 'admin').maybeSingle(),
+      supabase.from('beekeepers').select('id').eq('user_id', userId).maybeSingle(),
+    ])
+    if (roleError) console.error('Impossible de vérifier le rôle :', roleError.message)
+    if (beekeeperError) console.error('Impossible de vérifier le profil apiculteur :', beekeeperError.message)
+    setIsAdmin(Boolean(roleRow))
+    setMyBeekeeperId(beekeeperRow?.id ?? null)
   }, [])
 
   useEffect(() => {
@@ -61,6 +59,7 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     isAdmin,
+    myBeekeeperId,
     loading,
     signIn,
     signOut,

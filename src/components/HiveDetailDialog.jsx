@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import EngagementRing from './EngagementRing'
+import { useBeekeepers } from '../hooks/useBeekeepers'
 import {
   PLACEMENTS,
   REGIONS,
@@ -34,6 +35,7 @@ export default function HiveDetailDialog({ hive, hives, isAdmin, onClose, onSave
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [form, setForm] = useState(null)
+  const { beekeepers } = useBeekeepers()
 
   useEffect(() => {
     if (!hive) return
@@ -46,7 +48,7 @@ export default function HiveDetailDialog({ hive, hives, isAdmin, onClose, onSave
       region: hive.region,
       placement: hive.placement,
       placementDetail: hive.placementDetail,
-      beekeeper: hive.beekeeper ?? '',
+      beekeeperId: hive.beekeeperId ?? '',
       shareRole: hive.shareRole ?? '',
       hostHiveId: hive.hostHiveId ?? '',
       startDate: hive.startDate,
@@ -93,7 +95,7 @@ export default function HiveDetailDialog({ hive, hives, isAdmin, onClose, onSave
         region: form.region,
         placement: form.placement,
         placementDetail: form.placementDetail.trim(),
-        beekeeper: form.beekeeper.trim(),
+        beekeeperId: form.beekeeperId || null,
         shareRole: form.placement === 'partage' ? form.shareRole : '',
         hostHiveId: form.placement === 'partage' && form.shareRole === 'heberge' ? form.hostHiveId : null,
         startDate: form.startDate,
@@ -136,7 +138,7 @@ export default function HiveDetailDialog({ hive, hives, isAdmin, onClose, onSave
               <Row label="Région" value={hive.region} />
               <Row label="Implantation" value={placementLabel[hive.placement]} />
               <Row label="Adresse exacte" value={hive.placementDetail} />
-              <Row label="Apiculteur partenaire" value={hive.beekeeper} />
+              <Row label="Apiculteur partenaire" value={hive.beekeeperName} />
               {hive.placement === 'partage' && (
                 <>
                   <Row label="Rôle" value={shareRoleLabel[hive.shareRole || '']} />
@@ -242,7 +244,14 @@ export default function HiveDetailDialog({ hive, hives, isAdmin, onClose, onSave
 
             <div>
               <label className={labelClass}>Apiculteur partenaire</label>
-              <input value={form.beekeeper} onChange={(e) => set('beekeeper', e.target.value)} className={inputClass} />
+              <select value={form.beekeeperId} onChange={(e) => set('beekeeperId', e.target.value)} className={inputClass}>
+                <option value="">Aucun apiculteur assigné</option>
+                {beekeepers.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Nombre de ruches</label>

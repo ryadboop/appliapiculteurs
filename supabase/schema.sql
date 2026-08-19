@@ -1,14 +1,9 @@
 -- ============================================================================
 -- Suivi des ruches IziGreen — schéma Supabase
 -- À coller intégralement dans Supabase > SQL Editor > New query > Run.
---
--- Aligné sur le schéma réel que Lovable Cloud avait généré (mêmes noms de
--- tables/colonnes : hives, user_roles, has_role...), avec deux renforts de
--- sécurité que l'original n'avait pas :
---   1. Le CA/prix est masqué en base pour les comptes non-admin (pas juste
---      caché à l'écran).
---   2. La création d'une ruche est réservée aux admins côté base, pas
---      seulement côté interface.
+-- Pour un projet NEUF uniquement. Si ton projet existe déjà (tables créées
+-- via une version précédente de ce script), utilise plutôt le fichier de
+-- migration correspondant dans ce dossier.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -26,8 +21,6 @@ CREATE TABLE public.user_roles (
 
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
--- security definer = peut lire user_roles même si la RLS ci-dessous
--- restreint l'accès direct (évite toute récursion de policy).
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
 RETURNS boolean
 LANGUAGE sql
@@ -74,7 +67,37 @@ GRANT SELECT ON public.user_roles TO authenticated;
 GRANT ALL ON public.user_roles TO service_role;
 
 -- ----------------------------------------------------------------------------
--- 2. RUCHERS (table "hives")
+-- 2. APICULTEURS PARTENAIRES
+-- ----------------------------------------------------------------------------
+CREATE TABLE public.beekeepers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  -- Rempli quand un compte de connexion est créé pour cet apiculteur,
+  -- depuis l'espace admin — permet de faire remonter ses propres ruchers
+  -- en premier sur son dashboard.
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.beekeepers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "beekeepers_read_all" ON public.beekeepers
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "beekeepers_insert_admin" ON public.beekeepers
+  FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "beekeepers_update_admin" ON public.beekeepers
+  FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "beekeepers_delete_admin" ON public.beekeepers
+  FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.beekeepers TO authenticated;
+GRANT ALL ON public.beekeepers TO service_role;
+
+INSERT INTO public.beekeepers (name) VALUES ('Dominique Parriaud')
+ON CONFLICT (name) DO NOTHING;
+
+-- ----------------------------------------------------------------------------
+-- 3. RUCHERS (table "hives")
 -- ----------------------------------------------------------------------------
 CREATE TABLE public.hives (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -87,16 +110,13 @@ CREATE TABLE public.hives (
 
   placement text NOT NULL DEFAULT 'site' CHECK (placement IN ('friche', 'site', 'partage')),
   placement_detail text NOT NULL DEFAULT '',
-  beekeeper text NOT NULL DEFAULT '',
+  beekeeper_id uuid REFERENCES public.beekeepers(id),
 
-  -- Rucher partagé : hôte (accueille) ou hébergé (rattaché à un hôte existant)
   share_role text NOT NULL DEFAULT '' CHECK (share_role IN ('', 'hote', 'heberge')),
   host_hive_id uuid REFERENCES public.hives(id) ON DELETE SET NULL,
 
   latitude double precision,
   longitude double precision,
-  -- Prix personnalisé — null = tarif de base (hive_count x 1440€ HT/an),
-  -- calculé côté application.
   price integer,
 
   created_by uuid REFERENCES auth.users(id),
@@ -113,6 +133,7 @@ CREATE TABLE public.hives (
 
 CREATE INDEX idx_hives_start_date ON public.hives(start_date);
 CREATE INDEX idx_hives_host ON public.hives(host_hive_id);
+CREATE INDEX idx_hives_beekeeper ON public.hives(beekeeper_id);
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -128,15 +149,8 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 ALTER TABLE public.hives ENABLE ROW LEVEL SECURITY;
 
--- Lecture directe de la table brute réservée aux admins (le prix y est en
--- clair). Les comptes standards passent par la vue masquée ci-dessous.
 CREATE POLICY "hives_read_admin_only" ON public.hives
   FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));
-
--- Création/modification/suppression réservées aux admins (renforcement :
--- l'original de Lovable autorisait n'importe quel compte connecté à créer
--- une ruche, ce qui contredit "les utilisateurs standards sont en lecture
--- seule").
 CREATE POLICY "hives_insert_admin_only" ON public.hives
   FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'));
 CREATE POLICY "hives_update_admin_only" ON public.hives
@@ -145,11 +159,8 @@ CREATE POLICY "hives_delete_admin_only" ON public.hives
   FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
 -- ----------------------------------------------------------------------------
--- 3. VUE SÉCURISÉE — lecture pour tout le monde, CA masqué pour les non-admins
+-- 4. VUE SÉCURISÉE — lecture pour tout le monde, CA masqué pour les non-admins
 -- ----------------------------------------------------------------------------
--- Le statut (à installer / en cours / renouvellement) est calculé à la volée
--- depuis start_date : jamais stocké, jamais désynchronisé, aucune tâche
--- planifiée à maintenir.
 CREATE VIEW public.v_hives AS
 SELECT
   h.id,
@@ -161,7 +172,8 @@ SELECT
   h.hive_count,
   h.placement,
   h.placement_detail,
-  h.beekeeper,
+  h.beekeeper_id,
+  b.name AS beekeeper_name,
   h.share_role,
   h.host_hive_id,
   h.latitude,
@@ -176,31 +188,25 @@ SELECT
   EXTRACT(YEAR FROM h.start_date)::int AS start_year,
   h.created_at,
   h.updated_at
-FROM public.hives h;
+FROM public.hives h
+LEFT JOIN public.beekeepers b ON b.id = h.beekeeper_id;
 
 GRANT SELECT ON public.v_hives TO authenticated;
 
 -- ----------------------------------------------------------------------------
--- 4. TEMPS RÉEL
+-- 5. TEMPS RÉEL
 -- ----------------------------------------------------------------------------
--- Réservé aux admins par construction : Realtime s'abonne à la table brute
--- (jamais à une vue), qui est elle-même verrouillée aux admins ci-dessus —
--- le CA ne transite donc jamais en clair sur ce canal. Les comptes standards
--- se resynchronisent via la vue (au chargement, au focus, et à intervalle).
 ALTER PUBLICATION supabase_realtime ADD TABLE public.hives;
 
 -- ============================================================================
 -- APRÈS EXÉCUTION :
--- 1. Authentication > Users > Add user, pour chacun des 50-60 comptes.
---    Un rôle "user" n'est PAS créé automatiquement ici (contrairement à la
---    version Lovable) — la gestion des accès se fera depuis l'espace admin
---    de l'appli (étape à venir). En attendant, tu peux insérer un rôle
---    manuellement :
---    insert into public.user_roles (user_id, role) values
---      ((select id from auth.users where email = '...'), 'user');
+-- 1. Authentication > Users > Add user, pour chacun des comptes (équipe +
+--    apiculteurs). Un rôle "user" n'est pas créé automatiquement — la
+--    gestion des accès se fera depuis l'espace admin de l'appli.
 -- 2. Ton propre compte (ryad.bouchami@izigroup.fr) passe admin automatique-
---    ment via le trigger, à la création de ton compte auth.
--- 3. Vérification recommandée : connecte-toi avec un compte "user" et
---    confirme que price/base_revenue renvoient bien null via v_hives, et
---    qu'une requête directe sur public.hives renvoie 0 ligne pour ce compte.
+--    ment via le trigger.
+-- 3. Pour lier un apiculteur à son compte de connexion une fois créé :
+--    update public.beekeepers set user_id =
+--      (select id from auth.users where email = '...')
+--    where name = '...';
 -- ============================================================================

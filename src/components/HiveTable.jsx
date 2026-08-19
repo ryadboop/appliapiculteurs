@@ -9,7 +9,7 @@ const statusStyles = {
   renewal: 'bg-honey-500 text-white',
 }
 
-export default function HiveTable({ hives, isAdmin, onDelete, onSelect }) {
+export default function HiveTable({ hives, isAdmin, myBeekeeperId, onDelete, onSelect }) {
   const cols = isAdmin ? '1.6fr 1.2fr 1fr 1.4fr 0.9fr' : '1.6fr 1.2fr 1.4fr 0.9fr'
 
   return (
@@ -54,7 +54,14 @@ export default function HiveTable({ hives, isAdmin, onDelete, onSelect }) {
                       <HexIcon className="w-4 h-4" />
                     </span>
                     <div className="leading-tight">
-                      <p className="font-semibold text-ink-900">{hive.name}</p>
+                      <p className="font-semibold text-ink-900 flex items-center gap-1.5">
+                        {hive.name}
+                        {myBeekeeperId && hive.beekeeperId === myBeekeeperId && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-honey-100 text-honey-600 px-1.5 py-0.5 rounded-full">
+                            Vous
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-ink-900/50">
                         {hive.site} · {hive.hiveCount} ruche{hive.hiveCount > 1 ? 's' : ''} · {placementLabel[hive.placement]}
                       </p>
@@ -63,7 +70,7 @@ export default function HiveTable({ hives, isAdmin, onDelete, onSelect }) {
 
                   <div className="text-sm">
                     <p className="text-ink-900">{hive.client}</p>
-                    <p className="text-xs text-ink-900/50">{hive.beekeeper ? `Apiculteur · ${hive.beekeeper}` : hive.region}</p>
+                    <p className="text-xs text-ink-900/50">{hive.beekeeperName ? `Apiculteur · ${hive.beekeeperName}` : hive.region}</p>
                   </div>
 
                   {isAdmin && (

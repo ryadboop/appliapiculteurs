@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Modal from './Modal'
+import { useBeekeepers } from '../hooks/useBeekeepers'
 import {
-  FAREINS_BEEKEEPER,
   FAREINS_REGION,
   FAREINS_SITE,
   PLACEMENTS,
@@ -27,7 +27,7 @@ const emptyForm = {
   region: REGIONS[0],
   placement: 'site',
   placementDetail: '',
-  beekeeper: '',
+  beekeeperId: '',
   shareRole: '',
   hostHiveId: '',
   startDate: new Date().toISOString().slice(0, 10),
@@ -47,6 +47,8 @@ export default function AddHiveDialog({ onCreate, hives }) {
   const [direction, setDirection] = useState(1)
   const [form, setForm] = useState(emptyForm)
   const [locating, setLocating] = useState(false)
+  const { beekeepers } = useBeekeepers()
+  const fareinsBeekeeper = beekeepers.find((b) => b.name === 'Dominique Parriaud')
 
   const placement = PLACEMENTS.find((p) => p.id === form.placement)
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
@@ -61,7 +63,7 @@ export default function AddHiveDialog({ onCreate, hives }) {
       hostHiveId: id === 'partage' ? f.hostHiveId : '',
       site: id === 'friche' ? FAREINS_SITE : f.site === FAREINS_SITE ? '' : f.site,
       region: id === 'friche' ? FAREINS_REGION : f.region,
-      beekeeper: id === 'friche' ? FAREINS_BEEKEEPER : f.beekeeper === FAREINS_BEEKEEPER ? '' : f.beekeeper,
+      beekeeperId: id === 'friche' ? (fareinsBeekeeper?.id ?? f.beekeeperId) : f.beekeeperId === fareinsBeekeeper?.id ? '' : f.beekeeperId,
     }))
 
   const shareValid =
@@ -115,7 +117,7 @@ export default function AddHiveDialog({ onCreate, hives }) {
       region: form.region,
       placement: form.placement,
       placementDetail: form.placementDetail.trim(),
-      beekeeper: form.beekeeper.trim(),
+      beekeeperId: form.beekeeperId || null,
       shareRole: form.placement === 'partage' ? form.shareRole : '',
       hostHiveId: form.placement === 'partage' && form.shareRole === 'heberge' ? form.hostHiveId : null,
       startDate: form.startDate,
@@ -333,13 +335,22 @@ export default function AddHiveDialog({ onCreate, hives }) {
 
                   <div>
                     <label className={labelClass}>Apiculteur partenaire</label>
-                    <input
-                      placeholder="Dominique Parriaud"
-                      value={form.beekeeper}
-                      onChange={(e) => set('beekeeper', e.target.value)}
-                      className={inputClass}
-                    />
-                    {form.placement === 'friche' && <p className="text-xs text-ink-900/50 mt-1">Pré-rempli automatiquement pour Fareins.</p>}
+                    <select value={form.beekeeperId} onChange={(e) => set('beekeeperId', e.target.value)} className={inputClass}>
+                      <option value="">Aucun apiculteur assigné</option>
+                      {beekeepers.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    {beekeepers.length === 0 && (
+                      <p className="text-xs text-ink-900/50 mt-1">
+                        Aucun apiculteur enregistré pour le moment — ajoutes-en depuis l'espace admin.
+                      </p>
+                    )}
+                    {form.placement === 'friche' && fareinsBeekeeper && (
+                      <p className="text-xs text-ink-900/50 mt-1">Pré-rempli automatiquement pour Fareins.</p>
+                    )}
                   </div>
 
                   <div>

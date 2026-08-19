@@ -19,11 +19,20 @@ const FILTERS = [
 ]
 
 export default function DashboardPage() {
-  const { isAdmin, signOut } = useAuth()
-  const { hives, loading, error, addHive, updateHive, removeHive } = useHives()
+  const { isAdmin, myBeekeeperId, signOut } = useAuth()
+  const { hives: hivesRaw, loading, error, addHive, updateHive, removeHive } = useHives()
   const [filter, setFilter] = useState('all')
   const [selectedId, setSelectedId] = useState(null)
   const year = new Date().getFullYear()
+
+  // Si le compte connecté est lié à un profil apiculteur, ses propres
+  // ruchers remontent en premier (tri stable, il voit aussi le reste).
+  const hives = useMemo(() => {
+    if (!myBeekeeperId) return hivesRaw
+    const miens = hivesRaw.filter((h) => h.beekeeperId === myBeekeeperId)
+    const autres = hivesRaw.filter((h) => h.beekeeperId !== myBeekeeperId)
+    return [...miens, ...autres]
+  }, [hivesRaw, myBeekeeperId])
 
   const visible = useMemo(() => (filter === 'all' ? hives : hives.filter((h) => h.status === filter)), [hives, filter])
 
@@ -141,7 +150,7 @@ export default function DashboardPage() {
         ) : error ? (
           <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-red-600">{error}</div>
         ) : (
-          <HiveTable hives={visible} isAdmin={isAdmin} onDelete={handleDelete} onSelect={(h) => setSelectedId(h.id)} />
+          <HiveTable hives={visible} isAdmin={isAdmin} myBeekeeperId={myBeekeeperId} onDelete={handleDelete} onSelect={(h) => setSelectedId(h.id)} />
         )}
       </section>
 
