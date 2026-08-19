@@ -1,24 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* Palette — vert forêt profond + doré miel, fond crème/brume */
+  /* Palette IziGreen réelle (convertie depuis les valeurs oklch du projet
+     Lovable d'origine) — vert forêt profond, blanc cassé, doré miel. */
   --color-forest-950: #0a1f14;
   --color-forest-800: #14432b;
-  --color-forest-700: #1c5638;
-  --color-forest-600: #256b46;
+  --color-forest-700: #235c3c;
+  --color-forest-600: #2f6b46;
   --color-forest-100: #dfeade;
 
   --color-honey-600: #c9911f;
   --color-honey-500: #e3a83b;
   --color-honey-400: #edc272;
-  --color-honey-100: #fbead0;
+  --color-honey-100: #f6e3bd;
 
-  --color-cream-50: #fbf9f4;
-  --color-mist-100: #eaf2e9;
-  --color-ink-900: #16211b;
+  --color-cream-50: #fafaf6;
+  --color-mist-100: #eef3ec;
+  --color-ink-900: #1c2b22;
 
-  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
@@ -26,8 +28,18 @@
   body {
     font-family: var(--font-sans);
     color: var(--color-ink-900);
-    background: linear-gradient(120deg, var(--color-mist-100) 0%, var(--color-cream-50) 45%, var(--color-honey-100) 100%);
+    background-color: var(--color-cream-50);
+    background-image:
+      radial-gradient(120% 90% at 10% -10%, color-mix(in srgb, var(--color-mist-100) 90%, transparent) 0%, transparent 60%),
+      radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--color-honey-100) 70%, transparent) 0%, transparent 55%);
+    background-attachment: fixed;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -42,9 +54,17 @@
 @layer components {
   .glass-card {
     background: color-mix(in srgb, white 72%, transparent);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid color-mix(in srgb, white 60%, var(--color-forest-100));
-    box-shadow: 0 8px 30px -12px rgba(20, 67, 43, 0.18);
+    box-shadow: 0 1px 2px rgba(20, 67, 43, 0.06), 0 12px 30px -12px rgba(20, 67, 43, 0.18);
+  }
+
+  .gradient-forest {
+    background-image: linear-gradient(140deg, var(--color-forest-700), var(--color-forest-600));
+  }
+
+  .gradient-honey {
+    background-image: linear-gradient(135deg, var(--color-honey-400), var(--color-honey-600));
   }
 }

@@ -1,274 +1,154 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
-import { useRuchers } from '../hooks/useRuchers'
+import { useHives } from '../hooks/useHives'
+import { celebrate } from '../lib/celebrate'
+import { formatEuro, statusLabel } from '../lib/hives'
 import KpiCard from '../components/KpiCard'
-import EngagementBadge from '../components/EngagementBadge'
 import AnimatedNumber from '../components/AnimatedNumber'
+import AddHiveDialog from '../components/AddHiveDialog'
+import HiveTable from '../components/HiveTable'
+import HiveDetailDialog from '../components/HiveDetailDialog'
 
-const ONGLETS_STATUT = [
-  { id: 'toutes', label: 'Toutes' },
-  { id: 'en_cours', label: 'En cours' },
-  { id: 'a_installer', label: 'À installer' },
-  { id: 'renouvellement', label: 'Renouvellement' },
+const FILTERS = [
+  { id: 'all', label: 'Toutes' },
+  { id: 'active', label: statusLabel.active },
+  { id: 'pending', label: statusLabel.pending },
+  { id: 'renewal', label: statusLabel.renewal },
 ]
 
-const STATUT_STYLE = {
-  a_installer: 'bg-forest-100 text-forest-800',
-  en_cours: 'bg-forest-800 text-white',
-  renouvellement: 'bg-honey-500 text-white',
-}
-
-const STATUT_LABEL = {
-  a_installer: 'À installer',
-  en_cours: 'En cours',
-  renouvellement: 'Renouvellement',
-}
-
-const formatEuros = (n) =>
-  (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-
 export default function DashboardPage() {
-  const { profile, isAdmin, signOut } = useAuth()
-  const { ruchers, loading, error } = useRuchers()
-  const [statutFiltre, setStatutFiltre] = useState('toutes')
-  const [historiqueOuvert, setHistoriqueOuvert] = useState(false)
+  const { isAdmin, signOut } = useAuth()
+  const { hives, loading, error, addHive, updateHive, removeHive } = useHives()
+  const [filter, setFilter] = useState('all')
+  const [selectedId, setSelectedId] = useState(null)
+  const year = new Date().getFullYear()
 
-  const anneeCourante = new Date().getFullYear()
-  const [anneeAffichee, setAnneeAffichee] = useState(anneeCourante)
+  const visible = useMemo(() => (filter === 'all' ? hives : hives.filter((h) => h.status === filter)), [hives, filter])
 
-  const anneesDisponibles = useMemo(() => {
-    const annees = new Set(ruchers.map((r) => r.annee_installation).filter(Boolean))
-    annees.add(anneeCourante)
-    return Array.from(annees).sort((a, b) => b - a)
-  }, [ruchers, anneeCourante])
+  // KPIs cumulatifs sur l'ensemble du portefeuille actif (pas juste les
+  // nouvelles installations de l'année) — cohérent avec la logique réelle du
+  // projet d'origine : "Saison {year}" est l'étiquette de la période en
+  // cours, la valeur reflète l'état actuel du parc de ruchers.
+  const revenue = isAdmin ? hives.reduce((s, h) => s + (h.revenue ?? 0), 0) : 0
+  const hiveCount = hives.reduce((s, h) => s + h.hiveCount, 0)
+  const clientCount = new Set(hives.map((h) => h.client.trim().toLowerCase()).filter(Boolean)).size
 
-  // Les 3 KPIs en tête portent sur les NOUVELLES ruches de l'année affichée
-  // (la saison qu'on regarde), pas sur tout le portefeuille.
-  const ruchersDeLaSaison = useMemo(
-    () => ruchers.filter((r) => r.annee_installation === anneeAffichee),
-    [ruchers, anneeAffichee]
-  )
-  const clientsUniques = useMemo(() => {
-    const ids = new Set(ruchersDeLaSaison.map((r) => r.client_id).filter(Boolean))
-    return ids.size
-  }, [ruchersDeLaSaison])
-  const caSaison = useMemo(
-    () => ruchersDeLaSaison.reduce((somme, r) => somme + Number(r.prix_total || 0), 0),
-    [ruchersDeLaSaison]
-  )
+  const create = async (hive) => {
+    await addHive(hive)
+    celebrate()
+  }
 
-  // Le tableau, lui, montre tout le portefeuille actif (peu importe l'année
-  // d'installation) : un rucher en "renouvellement" a forcément été installé
-  // il y a 3 ans, pas cette saison — il doit rester visible ici.
-  const ruchersAffiches = useMemo(() => {
-    if (statutFiltre === 'toutes') return ruchers
-    return ruchers.filter((r) => r.statut === statutFiltre)
-  }, [ruchers, statutFiltre])
+  const handleDelete = async (id) => {
+    await removeHive(id)
+  }
+
+  const selected = hives.find((h) => h.id === selectedId) ?? null
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:px-8 lg:px-12">
-      <div className="max-w-6xl mx-auto">
-        {/* En-tête */}
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <span className="relative inline-block font-bold text-forest-800 text-lg">
-              izigreen
-              <CheckBadge />
-            </span>
-            <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="flex items-center gap-1.5 text-ink-900/60">
-              <ShieldIcon className="w-4 h-4" />
-              {isAdmin ? 'Admin' : profile?.full_name || 'Utilisateur'}
-            </span>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-1.5 text-ink-900/60 hover:text-ink-900 transition"
-            >
-              <LogoutIcon className="w-4 h-4" />
-              Se déconnecter
-            </button>
-          </div>
-        </header>
-
-        <span className="inline-flex items-center gap-1.5 bg-forest-800/5 border border-forest-800/10 text-forest-800 text-xs font-medium px-3 py-1 rounded-full mb-4">
-          IziGreen · Saison {anneeAffichee}
+    <main className="mx-auto w-full max-w-6xl px-5 py-10 md:px-8 md:py-14">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="mb-8 flex items-center gap-3">
+        <span className="relative inline-block font-bold text-forest-800 text-lg">
+          izigreen
+          <CheckBadge />
         </span>
-
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-ink-900">
-              Vos ruchers, en un coup d'œil
-            </h1>
-            <p className="text-ink-900/50 mt-1.5">
-              Chiffres clés du 1er janvier au 31 décembre {anneeAffichee} · clôture et archivage
-              automatiques chaque 1er janvier.
-            </p>
-          </div>
-          <div className="flex gap-2 relative">
-            <button
-              onClick={() => setHistoriqueOuvert((v) => !v)}
-              className="flex items-center gap-2 rounded-xl border border-forest-800/15 bg-white px-4 py-2.5 text-sm font-medium text-ink-900 hover:bg-forest-100/40 transition"
-            >
-              <HistoryIcon className="w-4 h-4" />
-              Historique
-            </button>
-            <AnimatePresence>
-              {historiqueOuvert && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="absolute right-0 top-full mt-2 glass-card rounded-2xl p-2 z-10 min-w-[160px]"
-                >
-                  {anneesDisponibles.map((annee) => (
-                    <button
-                      key={annee}
-                      onClick={() => {
-                        setAnneeAffichee(annee)
-                        setHistoriqueOuvert(false)
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-sm transition ${
-                        annee === anneeAffichee
-                          ? 'bg-forest-800 text-white'
-                          : 'hover:bg-forest-100/60 text-ink-900'
-                      }`}
-                    >
-                      Saison {annee}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {isAdmin && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2 rounded-xl bg-honey-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-honey-600 transition shadow-sm"
-              >
-                <PlusIcon className="w-4 h-4" />
-                Ajouter une ruche
-              </motion.button>
-            )}
-          </div>
-        </div>
-
-        {/* KPIs */}
-        <div className={`grid gap-3 mb-8 ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <KpiCard icon={<HiveIcon className="w-5 h-5" />} label="Ruches installées" sublabel={`${ruchersDeLaSaison.length} rucher${ruchersDeLaSaison.length > 1 ? 's' : ''} suivi${ruchersDeLaSaison.length > 1 ? 's' : ''}`}>
-            <AnimatedNumber value={ruchersDeLaSaison.length} />
-          </KpiCard>
-          <KpiCard icon={<UsersIcon className="w-5 h-5" />} label="Clients uniques" sublabel="Nouveaux clients cette saison">
-            <AnimatedNumber value={clientsUniques} />
-          </KpiCard>
+        <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
+        <div className="ml-auto flex items-center gap-1">
           {isAdmin && (
-            <KpiCard icon={<TrendingIcon className="w-5 h-5" />} label="Chiffre d'affaires" sublabel="Cumul annuel contractualisé HT" accent="honey">
-              <AnimatedNumber value={caSaison} formatter={formatEuros} />
-            </KpiCard>
+            <Link to="/admin" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
+              <ShieldIcon className="w-4 h-4" /> Admin
+            </Link>
           )}
+          <button onClick={signOut} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
+            <LogoutIcon className="w-4 h-4" /> Se déconnecter
+          </button>
         </div>
+      </motion.div>
 
-        {/* Tableau */}
-        <div className="glass-card rounded-3xl overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4">
-            <div className="flex items-center gap-6">
-              {ONGLETS_STATUT.map((onglet) => (
-                <button
-                  key={onglet.id}
-                  onClick={() => setStatutFiltre(onglet.id)}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition ${
-                    statutFiltre === onglet.id ? 'text-white' : 'text-ink-900/60 hover:text-ink-900'
-                  }`}
-                >
-                  {statutFiltre === onglet.id && (
-                    <motion.span
-                      layoutId="onglet-actif"
-                      className="absolute inset-0 bg-forest-800 rounded-full"
-                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative">{onglet.label}</span>
-                </button>
-              ))}
-            </div>
-            <span className="text-sm text-ink-900/50">
-              {ruchersAffiches.length} rucher{ruchersAffiches.length > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs font-semibold text-ink-900/40 uppercase tracking-wide border-t border-forest-800/10">
-                  <th className="px-6 py-3">Rucher</th>
-                  <th className="px-6 py-3">Client</th>
-                  {isAdmin && <th className="px-6 py-3">CA annuel</th>}
-                  <th className="px-6 py-3">Engagement 3 ans</th>
-                  <th className="px-6 py-3">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={isAdmin ? 5 : 4} className="px-6 py-10 text-center text-ink-900/40">
-                      Chargement…
-                    </td>
-                  </tr>
-                )}
-                {error && (
-                  <tr>
-                    <td colSpan={isAdmin ? 5 : 4} className="px-6 py-10 text-center text-red-600">
-                      {error}
-                    </td>
-                  </tr>
-                )}
-                {!loading && !error && ruchersAffiches.length === 0 && (
-                  <tr>
-                    <td colSpan={isAdmin ? 5 : 4} className="px-6 py-10 text-center text-ink-900/40">
-                      Aucune ruche pour le moment · ajoutez votre première ruche pour démarrer.
-                    </td>
-                  </tr>
-                )}
-                <AnimatePresence>
-                  {!loading &&
-                    !error &&
-                    ruchersAffiches.map((r) => (
-                      <motion.tr
-                        key={r.id}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="border-t border-forest-800/8 hover:bg-mist-100/50 transition-colors"
-                      >
-                        <td className="px-6 py-3.5 font-medium text-ink-900">
-                          {r.commune_ville || '—'}
-                        </td>
-                        <td className="px-6 py-3.5 text-ink-900/70">{r.client_nom || '—'}</td>
-                        {isAdmin && (
-                          <td className="px-6 py-3.5 font-mono text-ink-900/80">
-                            {formatEuros(r.prix_total)}
-                          </td>
-                        )}
-                        <td className="px-6 py-3.5">
-                          <EngagementBadge dateInstallation={r.date_installation} statut={r.statut} />
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${STATUT_STYLE[r.statut]}`}>
-                            {STATUT_LABEL[r.statut]}
-                          </span>
-                        </td>
-                      </motion.tr>
-                    ))}
-                </AnimatePresence>
-              </tbody>
-            </table>
-          </div>
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-wrap items-end justify-between gap-6"
+      >
+        <div>
+          <span className="inline-flex items-center gap-2 rounded-full bg-forest-800/10 px-3 py-1 text-xs font-semibold text-forest-800">
+            <LeafIcon className="w-3.5 h-3.5" /> IziGreen · Saison {year}
+          </span>
+          <h1 className="mt-3 text-4xl font-semibold text-ink-900 md:text-5xl" style={{ fontFamily: 'var(--font-display)' }}>
+            Vos ruchers, en un coup d'œil
+          </h1>
+          <p className="mt-2 max-w-lg text-sm text-ink-900/50">
+            Chiffres clés du 1<sup>er</sup> janvier au 31 décembre {year} · clôture et archivage automatiques chaque 1<sup>er</sup> janvier.
+          </p>
         </div>
-      </div>
-    </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/historique"
+            className="flex items-center gap-2 rounded-2xl border border-forest-800/15 bg-white/70 px-4 py-2.5 text-sm font-medium text-ink-900 hover:bg-white transition"
+          >
+            <ArchiveIcon className="w-4 h-4" /> Historique
+          </Link>
+          {isAdmin && <AddHiveDialog onCreate={create} hives={hives} />}
+        </div>
+      </motion.header>
+
+      <section className={`mt-9 grid gap-4 ${isAdmin ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <KpiCard icon={<HexIcon className="w-5 h-5" />} label={`Ruches installées ${year}`} sublabel={`${hives.length} rucher${hives.length > 1 ? 's' : ''} suivi${hives.length > 1 ? 's' : ''}`}>
+          <AnimatedNumber value={hiveCount} />
+        </KpiCard>
+        <KpiCard icon={<UsersIcon className="w-5 h-5" />} label="Clients uniques" sublabel="Parrains distincts cette année">
+          <AnimatedNumber value={clientCount} />
+        </KpiCard>
+        {isAdmin && (
+          <KpiCard icon={<TrendIcon className="w-5 h-5" />} label="Chiffre d'affaires" sublabel="Cumul annuel contractualisé HT" accent="honey">
+            <AnimatedNumber value={revenue} formatter={formatEuro} />
+          </KpiCard>
+        )}
+      </section>
+
+      <section className="mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+          className="glass-card flex flex-wrap items-center gap-2 rounded-3xl p-3"
+        >
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`relative rounded-2xl px-4 py-2 text-sm font-medium transition-colors ${
+                filter === f.id ? 'text-white' : 'text-ink-900/60 hover:text-ink-900'
+              }`}
+            >
+              {filter === f.id && (
+                <motion.span layoutId="filter-pill" className="gradient-forest absolute inset-0 rounded-2xl" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />
+              )}
+              <span className="relative z-10">{f.label}</span>
+            </button>
+          ))}
+          <span className="ml-auto pr-2 text-xs text-ink-900/40">
+            {visible.length} rucher{visible.length > 1 ? 's' : ''}
+          </span>
+        </motion.div>
+      </section>
+
+      <section className="mt-4">
+        {loading ? (
+          <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">Chargement…</div>
+        ) : error ? (
+          <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-red-600">{error}</div>
+        ) : (
+          <HiveTable hives={visible} isAdmin={isAdmin} onDelete={handleDelete} onSelect={(h) => setSelectedId(h.id)} />
+        )}
+      </section>
+
+      {selected && (
+        <HiveDetailDialog hive={selected} hives={hives} isAdmin={isAdmin} onClose={() => setSelectedId(null)} onSave={updateHive} />
+      )}
+    </main>
   )
 }
 
@@ -280,7 +160,7 @@ function CheckBadge() {
     </svg>
   )
 }
-function HiveIcon(props) {
+function HexIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M12 2 3 7v10l9 5 9-5V7z" />
@@ -297,7 +177,7 @@ function UsersIcon(props) {
     </svg>
   )
 }
-function TrendingIcon(props) {
+function TrendIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -305,19 +185,19 @@ function TrendingIcon(props) {
     </svg>
   )
 }
-function PlusIcon(props) {
+function ArchiveIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 5v14M5 12h14" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="2" y="4" width="20" height="5" rx="1" />
+      <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9M10 13h4" />
     </svg>
   )
 }
-function HistoryIcon(props) {
+function LeafIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M3 3v5h5" />
-      <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-      <path d="M12 7v5l4 2" />
+      <path d="M11 20A7 7 0 0 1 4 13V6a1 1 0 0 1 1-1h7a7 7 0 0 1 7 7 7 7 0 0 1-7 7Z" />
+      <path d="M4 20l6-6" />
     </svg>
   )
 }

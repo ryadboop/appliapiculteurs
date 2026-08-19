@@ -5,25 +5,26 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const loadProfile = useCallback(async (userId) => {
+  const loadRole = useCallback(async (userId) => {
     if (!userId) {
-      setProfile(null)
+      setIsAdmin(false)
       return
     }
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id, role, full_name')
-      .eq('id', userId)
-      .single()
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'admin')
+      .maybeSingle()
     if (error) {
-      console.error('Impossible de charger le profil :', error.message)
-      setProfile(null)
+      console.error('Impossible de vérifier le rôle :', error.message)
+      setIsAdmin(false)
       return
     }
-    setProfile(data)
+    setIsAdmin(Boolean(data))
   }, [])
 
   useEffect(() => {
@@ -32,20 +33,20 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return
       setSession(session)
-      await loadProfile(session?.user?.id)
+      await loadRole(session?.user?.id)
       setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
-      await loadProfile(session?.user?.id)
+      await loadRole(session?.user?.id)
     })
 
     return () => {
       isMounted = false
       listener.subscription.unsubscribe()
     }
-  }, [loadProfile])
+  }, [loadRole])
 
   const signIn = useCallback(async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -59,8 +60,7 @@ export function AuthProvider({ children }) {
   const value = {
     session,
     user: session?.user ?? null,
-    profile,
-    isAdmin: profile?.role === 'admin',
+    isAdmin,
     loading,
     signIn,
     signOut,

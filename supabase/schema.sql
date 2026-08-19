@@ -1,226 +1,206 @@
 -- ============================================================================
 -- Suivi des ruches IziGreen — schéma Supabase
 -- À coller intégralement dans Supabase > SQL Editor > New query > Run.
--- Peut être exécuté une seule fois sur un projet neuf.
+--
+-- Aligné sur le schéma réel que Lovable Cloud avait généré (mêmes noms de
+-- tables/colonnes : hives, user_roles, has_role...), avec deux renforts de
+-- sécurité que l'original n'avait pas :
+--   1. Le CA/prix est masqué en base pour les comptes non-admin (pas juste
+--      caché à l'écran).
+--   2. La création d'une ruche est réservée aux admins côté base, pas
+--      seulement côté interface.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. PROFILS (rôle admin / utilisateur)
+-- 1. RÔLES (admin / user)
 -- ----------------------------------------------------------------------------
-create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  role text not null default 'user' check (role in ('admin', 'user')),
-  full_name text,
-  created_at timestamptz not null default now()
+CREATE TYPE public.app_role AS ENUM ('admin', 'user');
+
+CREATE TABLE public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role public.app_role NOT NULL DEFAULT 'user',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, role)
 );
 
--- Crée automatiquement un profil (rôle "user" par défaut) à chaque nouvel
--- utilisateur créé dans Supabase Authentication. Passer un compte en admin
--- se fait ensuite avec : update public.profiles set role = 'admin' where id = '...';
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (id, role, full_name)
-  values (new.id, 'user', coalesce(new.raw_user_meta_data->>'full_name', new.email));
-  return new;
-end;
-$$;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
-create trigger on_auth_user_created
-after insert on auth.users
-for each row execute function public.handle_new_user();
-
--- Fonction utilitaire : l'utilisateur connecté est-il admin ?
--- security definer = peut lire "profiles" même si la RLS de "profiles"
+-- security definer = peut lire user_roles même si la RLS ci-dessous
 -- restreint l'accès direct (évite toute récursion de policy).
-create or replace function public.is_admin()
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
-  );
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role
+  )
 $$;
 
--- ----------------------------------------------------------------------------
--- 2. CLIENTS
--- ----------------------------------------------------------------------------
-create table public.clients (
-  id uuid primary key default gen_random_uuid(),
-  nom text not null,
-  created_at timestamptz not null default now()
-);
+CREATE POLICY "own_roles_readable" ON public.user_roles
+  FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "admins_read_all_roles" ON public.user_roles
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));
+
+-- Passe automatiquement ton propre compte en admin à la création — pense à
+-- changer l'email ci-dessous si besoin avant d'exécuter ce script.
+CREATE OR REPLACE FUNCTION public.grant_owner_admin()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF lower(NEW.email) = 'ryad.bouchami@izigroup.fr' THEN
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, 'admin')
+    ON CONFLICT (user_id, role) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created_grant_owner_admin
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.grant_owner_admin();
+
+REVOKE ALL ON FUNCTION public.grant_owner_admin() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.has_role(uuid, public.app_role) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
+GRANT SELECT ON public.user_roles TO authenticated;
+GRANT ALL ON public.user_roles TO service_role;
 
 -- ----------------------------------------------------------------------------
--- 3. RUCHERS (table centrale)
+-- 2. RUCHERS (table "hives")
 -- ----------------------------------------------------------------------------
-create table public.ruchers (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid references public.clients(id),
+CREATE TABLE public.hives (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  client text NOT NULL DEFAULT '',
+  site text NOT NULL DEFAULT '',
+  region text NOT NULL DEFAULT '',
+  start_date date NOT NULL,
+  hive_count integer NOT NULL DEFAULT 1 CHECK (hive_count > 0),
 
-  lieu_type text not null check (lieu_type in ('fareins', 'sur_site', 'rucher_partage')),
-  adresse text,
-  commune_ville text,
-  region text,
-  latitude numeric(9,6),
-  longitude numeric(9,6),
+  placement text NOT NULL DEFAULT 'site' CHECK (placement IN ('friche', 'site', 'partage')),
+  placement_detail text NOT NULL DEFAULT '',
+  beekeeper text NOT NULL DEFAULT '',
 
-  nombre_ruches integer not null default 1 check (nombre_ruches > 0),
-  apiculteur text,
+  -- Rucher partagé : hôte (accueille) ou hébergé (rattaché à un hôte existant)
+  share_role text NOT NULL DEFAULT '' CHECK (share_role IN ('', 'hote', 'heberge')),
+  host_hive_id uuid REFERENCES public.hives(id) ON DELETE SET NULL,
 
-  -- Rucher partagé : hôte (accueille) ou hébergé (rattaché à un rucher hôte existant)
-  rucher_partage_role text check (rucher_partage_role in ('hote', 'heberge')),
-  rucher_hote_id uuid references public.ruchers(id),
+  latitude double precision,
+  longitude double precision,
+  -- Prix personnalisé — null = tarif de base (hive_count x 1440€ HT/an),
+  -- calculé côté application.
+  price integer,
 
-  -- Tarif de base = nombre de ruches x 1440€ HT/an, calculé automatiquement.
-  -- Le prix réellement facturé (prix_total) est pré-rempli avec ce montant
-  -- côté formulaire mais reste modifiable pour appliquer une remise.
-  prix_base numeric(10,2) generated always as (nombre_ruches * 1440) stored,
-  prix_total numeric(10,2) not null,
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
 
-  -- null ou date future = "à installer" (pas encore posée)
-  date_installation date,
-
-  created_by uuid references public.profiles(id),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-
-  constraint chk_adresse_si_necessaire check (
-    lieu_type = 'fareins' or (adresse is not null and length(trim(adresse)) > 0)
+  CONSTRAINT chk_adresse_si_necessaire CHECK (
+    placement = 'friche' OR length(trim(placement_detail)) > 0
   ),
-  constraint chk_role_partage_coherent check (
-    lieu_type = 'rucher_partage' or (rucher_partage_role is null and rucher_hote_id is null)
-  ),
-  constraint chk_heberge_a_un_hote check (
-    rucher_partage_role is distinct from 'heberge' or rucher_hote_id is not null
+  CONSTRAINT chk_heberge_a_un_hote CHECK (
+    share_role <> 'heberge' OR host_hive_id IS NOT NULL
   )
 );
 
-create index idx_ruchers_client on public.ruchers(client_id);
-create index idx_ruchers_date_installation on public.ruchers(date_installation);
-create index idx_ruchers_hote on public.ruchers(rucher_hote_id);
+CREATE INDEX idx_hives_start_date ON public.hives(start_date);
+CREATE INDEX idx_hives_host ON public.hives(host_hive_id);
 
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
 $$;
 
-create trigger trg_ruchers_updated_at
-before update on public.ruchers
-for each row execute function public.set_updated_at();
+CREATE TRIGGER trg_hives_updated_at
+BEFORE UPDATE ON public.hives
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.hives ENABLE ROW LEVEL SECURITY;
+
+-- Lecture directe de la table brute réservée aux admins (le prix y est en
+-- clair). Les comptes standards passent par la vue masquée ci-dessous.
+CREATE POLICY "hives_read_admin_only" ON public.hives
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));
+
+-- Création/modification/suppression réservées aux admins (renforcement :
+-- l'original de Lovable autorisait n'importe quel compte connecté à créer
+-- une ruche, ce qui contredit "les utilisateurs standards sont en lecture
+-- seule").
+CREATE POLICY "hives_insert_admin_only" ON public.hives
+  FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "hives_update_admin_only" ON public.hives
+  FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "hives_delete_admin_only" ON public.hives
+  FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 
 -- ----------------------------------------------------------------------------
--- 4. VUE SÉCURISÉE — un seul point d'accès en lecture pour tout le monde
+-- 3. VUE SÉCURISÉE — lecture pour tout le monde, CA masqué pour les non-admins
 -- ----------------------------------------------------------------------------
 -- Le statut (à installer / en cours / renouvellement) est calculé à la volée
--- depuis la date d'installation : pas de tâche planifiée à maintenir, jamais
--- désynchronisé. Pareil pour l'année de saison, dérivée de la date — au
--- 1er janvier, "cette année" redevient naturellement vide.
---
--- Masquage du CA : prix_base et prix_total renvoient NULL pour tout compte
--- qui n'a pas le rôle admin, directement dans la requête SQL (donc même en
--- inspectant le réseau depuis le navigateur, un compte "user" ne reçoit
--- jamais la valeur réelle — ce n'est pas juste caché à l'affichage).
-create view public.v_ruchers as
-select
-  r.id,
-  r.client_id,
-  c.nom as client_nom,
-  r.lieu_type,
-  r.adresse,
-  r.commune_ville,
-  r.region,
-  r.latitude,
-  r.longitude,
-  r.nombre_ruches,
-  r.apiculteur,
-  r.rucher_partage_role,
-  r.rucher_hote_id,
-  case when public.is_admin() then r.prix_base else null end as prix_base,
-  case when public.is_admin() then r.prix_total else null end as prix_total,
-  r.date_installation,
-  extract(year from r.date_installation)::int as annee_installation,
-  case
-    when r.date_installation is null or r.date_installation > current_date then 'a_installer'
-    when current_date >= (r.date_installation + interval '3 years') then 'renouvellement'
-    else 'en_cours'
-  end as statut,
-  r.created_at,
-  r.updated_at
-from public.ruchers r
-left join public.clients c on c.id = r.client_id;
+-- depuis start_date : jamais stocké, jamais désynchronisé, aucune tâche
+-- planifiée à maintenir.
+CREATE VIEW public.v_hives AS
+SELECT
+  h.id,
+  h.name,
+  h.client,
+  h.site,
+  h.region,
+  h.start_date,
+  h.hive_count,
+  h.placement,
+  h.placement_detail,
+  h.beekeeper,
+  h.share_role,
+  h.host_hive_id,
+  h.latitude,
+  h.longitude,
+  CASE WHEN public.has_role(auth.uid(), 'admin') THEN h.price ELSE NULL END AS price,
+  CASE WHEN public.has_role(auth.uid(), 'admin') THEN h.hive_count * 1440 ELSE NULL END AS base_revenue,
+  CASE
+    WHEN h.start_date > CURRENT_DATE THEN 'pending'
+    WHEN CURRENT_DATE >= (h.start_date + INTERVAL '3 years') THEN 'renewal'
+    ELSE 'active'
+  END AS status,
+  EXTRACT(YEAR FROM h.start_date)::int AS start_year,
+  h.created_at,
+  h.updated_at
+FROM public.hives h;
+
+GRANT SELECT ON public.v_hives TO authenticated;
 
 -- ----------------------------------------------------------------------------
--- 5. SÉCURITÉ (Row Level Security)
+-- 4. TEMPS RÉEL
 -- ----------------------------------------------------------------------------
-alter table public.profiles enable row level security;
-alter table public.clients enable row level security;
-alter table public.ruchers enable row level security;
-
--- profiles : chacun voit son propre profil, les admins voient tout le monde
-create policy "Voir son profil ou tout si admin" on public.profiles
-  for select using (auth.uid() = id or public.is_admin());
-
--- clients : accès direct à la table réservé aux admins.
--- Les utilisateurs standards passent uniquement par v_ruchers (client_nom),
--- jamais par la table brute.
-create policy "Clients: lecture admin uniquement" on public.clients
-  for select using (public.is_admin());
-create policy "Clients: écriture admin uniquement" on public.clients
-  for insert with check (public.is_admin());
-create policy "Clients: modif admin uniquement" on public.clients
-  for update using (public.is_admin()) with check (public.is_admin());
-
--- ruchers : même logique — accès direct réservé aux admins, tout le monde
--- passe par v_ruchers en lecture (qui masque le CA pour les non-admins).
-create policy "Ruchers: lecture admin uniquement" on public.ruchers
-  for select using (public.is_admin());
-create policy "Ruchers: création admin uniquement" on public.ruchers
-  for insert with check (public.is_admin());
-create policy "Ruchers: modif admin uniquement" on public.ruchers
-  for update using (public.is_admin()) with check (public.is_admin());
-create policy "Ruchers: suppression admin uniquement" on public.ruchers
-  for delete using (public.is_admin());
-
--- Autorise tout le monde à lire la vue sécurisée (elle applique elle-même
--- le masquage du CA ligne par ligne selon le rôle de l'appelant).
-grant select on public.v_ruchers to authenticated;
-grant select, insert, update, delete on public.ruchers to authenticated;
-grant select, insert, update on public.clients to authenticated;
-grant select on public.profiles to authenticated;
-
--- ----------------------------------------------------------------------------
--- 6. TEMPS RÉEL
--- ----------------------------------------------------------------------------
--- Permet aux comptes admin de recevoir les mises à jour instantanément
--- (insertion/modif/suppression d'un rucher) sans recharger la page.
--- Note : Supabase Realtime s'abonne à la table brute (pas à une vue), donc
--- ce canal respecte la policy "Ruchers: lecture admin uniquement" ci-dessus
--- — un compte standard n'y a pas accès, ce qui est volontaire pour ne
--- jamais transmettre le CA en clair sur le réseau, même dans un message
--- realtime. Les comptes standards se resynchronisent via un rafraîchissement
--- de la vue (au chargement, après une action, et à intervalle régulier).
-alter publication supabase_realtime add table public.ruchers;
+-- Réservé aux admins par construction : Realtime s'abonne à la table brute
+-- (jamais à une vue), qui est elle-même verrouillée aux admins ci-dessus —
+-- le CA ne transite donc jamais en clair sur ce canal. Les comptes standards
+-- se resynchronisent via la vue (au chargement, au focus, et à intervalle).
+ALTER PUBLICATION supabase_realtime ADD TABLE public.hives;
 
 -- ============================================================================
 -- APRÈS EXÉCUTION :
--- 1. Authentication > Users > Add user, pour chacun des 50-60 comptes
---    (email + mot de passe, ou lien magique — un profil "user" est créé
---    automatiquement par le trigger ci-dessus).
--- 2. Pour te passer admin (et tes futurs admins) :
---    update public.profiles set role = 'admin' where id =
---      (select id from auth.users where email = 'ton.email@izigreen.fr');
+-- 1. Authentication > Users > Add user, pour chacun des 50-60 comptes.
+--    Un rôle "user" n'est PAS créé automatiquement ici (contrairement à la
+--    version Lovable) — la gestion des accès se fera depuis l'espace admin
+--    de l'appli (étape à venir). En attendant, tu peux insérer un rôle
+--    manuellement :
+--    insert into public.user_roles (user_id, role) values
+--      ((select id from auth.users where email = '...'), 'user');
+-- 2. Ton propre compte (ryad.bouchami@izigroup.fr) passe admin automatique-
+--    ment via le trigger, à la création de ton compte auth.
 -- 3. Vérification recommandée : connecte-toi avec un compte "user" et
---    confirme que prix_base/prix_total renvoient bien null via v_ruchers.
+--    confirme que price/base_revenue renvoient bien null via v_hives, et
+--    qu'une requête directe sur public.hives renvoie 0 ligne pour ce compte.
 -- ============================================================================
