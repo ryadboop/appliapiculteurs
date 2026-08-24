@@ -1,0 +1,41 @@
+name: Sauvegarde quotidienne Supabase
+
+on:
+  schedule:
+    # Tous les jours à 3h UTC (4h ou 5h en France selon l'heure d'été)
+    - cron: '0 3 * * *'
+  workflow_dispatch: {} # permet aussi de la lancer manuellement depuis l'onglet Actions
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer les outils PostgreSQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Sauvegarder le schéma public (données de l'appli)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backups
+          pg_dump "$DATABASE_URL" --schema=public --no-owner --no-privileges --clean --if-exists \
+            > "backups/$(date -u +%F).sql"
+
+      - name: Ne garder que les 14 dernières sauvegardes
+        run: |
+          cd backups
+          ls -1t *.sql 2>/dev/null | tail -n +15 | xargs -r rm --
+
+      - name: Committer la sauvegarde
+        run: |
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@izigreen.local"
+          git add backups/
+          git diff --cached --quiet || git commit -m "Sauvegarde automatique $(date -u +%F)"
+          git push

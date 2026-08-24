@@ -22,6 +22,9 @@ base de données.
 ✅ Confettis à la création d'une ruche, compteurs animés, anneau de progression
    de l'engagement
 ✅ Installable sur téléphone (PWA), mise à jour automatique sans réinstallation
+✅ Journal d'audit (qui a créé/modifié/supprimé quoi, et quand), restauration
+   d'un rucher supprimé
+✅ Sauvegarde quotidienne automatique de la base (GitHub Actions, gratuite)
 
 🔜 À venir : l'espace admin (`/admin`) est pour l'instant un écran d'attente.
    La création/suppression de comptes utilisateurs directement depuis l'appli
@@ -72,3 +75,26 @@ côté hébergeur. Chaque `git push` redéploie automatiquement.
 
 `public/icon-192.png` et `public/icon-512.png` sont provisoires — à
 remplacer par le logo IziGreen si besoin, mêmes noms de fichiers.
+
+### Activer la sauvegarde automatique quotidienne
+
+Le workflow existe déjà (`.github/workflows/backup.yml`), il ne manque
+qu'une information secrète pour qu'il puisse se connecter à la base :
+
+1. **Récupère la chaîne de connexion** : Supabase > Project Settings (⚙️)
+   > Database > Connection string > sélectionne le format **URI**. Si tu ne
+   te souviens plus du mot de passe de la base, un bouton "Reset database
+   password" est juste à côté.
+2. **Ajoute-la comme secret GitHub** : sur `github.com/ryadboop/appliapiculteurs`
+   > Settings > Secrets and variables > Actions > **New repository secret**.
+   Nom : `SUPABASE_DB_URL`. Valeur : la chaîne de connexion complète
+   (avec le mot de passe dedans, à la place de `[YOUR-PASSWORD]`).
+3. C'est tout. La sauvegarde tourne chaque nuit automatiquement, et garde
+   les 14 derniers jours dans le dossier `backups/` du repo (les plus
+   anciennes sont supprimées automatiquement).
+
+Pour tester tout de suite sans attendre la nuit : onglet **Actions** du
+repo > "Sauvegarde quotidienne Supabase" > **Run workflow**.
+
+Ces sauvegardes couvrent uniquement les données de l'appli (`public`),
+pas les comptes/mots de passe (gérés par Supabase lui-même).
