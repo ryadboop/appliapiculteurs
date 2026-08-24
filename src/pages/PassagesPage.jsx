@@ -13,17 +13,16 @@ export default function PassagesPage() {
   const { lastVisitByHive, addVisit } = useHiveVisits()
   const [activeHive, setActiveHive] = useState(null)
 
-  const mesRuchers = useMemo(() => {
-    if (!myBeekeeperId) return []
-    return hives
-      .filter((h) => h.beekeeperId === myBeekeeperId)
+  const ruchersAffiches = useMemo(() => {
+    const base = isAdmin ? hives : hives.filter((h) => h.beekeeperId === myBeekeeperId)
+    return base
       .map((h) => {
         const dernier = lastVisitByHive[h.id]
         const echeance = nextVisitDue(dernier?.visitDate, h.startDate)
         return { ...h, dernierPassage: dernier, echeance }
       })
       .sort((a, b) => a.echeance.daysUntilDue - b.echeance.daysUntilDue)
-  }, [hives, myBeekeeperId, lastVisitByHive])
+  }, [hives, isAdmin, myBeekeeperId, lastVisitByHive])
 
   if (!hivesLoading && !myBeekeeperId && !isAdmin) {
     return (
@@ -48,25 +47,27 @@ export default function PassagesPage() {
         Passages mensuels
       </h1>
       <p className="mt-2 max-w-lg text-sm text-ink-900/50">
-        Un passage par mois et par rucher. Une alerte apparaît 3 jours avant l'échéance.
+        {isAdmin
+          ? "Vue d'ensemble de tous les ruchers, tous apiculteurs confondus. Une alerte apparaît 3 jours avant l'échéance."
+          : "Un passage par mois et par rucher. Une alerte apparaît 3 jours avant l'échéance."}
       </p>
 
       <div className="mt-8 space-y-3">
         {hivesLoading && <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">Chargement…</div>}
-        {!hivesLoading && mesRuchers.length === 0 && (
+        {!hivesLoading && ruchersAffiches.length === 0 && (
           <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">
-            Aucun rucher ne t'est encore assigné.
+            {isAdmin ? 'Aucun rucher enregistré pour le moment.' : "Aucun rucher ne t'est encore assigné."}
           </div>
         )}
-        {mesRuchers.map((h) => (
-          <VisitCard key={h.id} hive={h} onLog={() => setActiveHive(h)} />
+        {ruchersAffiches.map((h) => (
+          <VisitCard key={h.id} hive={h} showBeekeeper={isAdmin} onLog={() => setActiveHive(h)} />
         ))}
       </div>
 
       {activeHive && (
         <LogVisitModal
           hive={activeHive}
-          beekeeperId={myBeekeeperId}
+          beekeeperId={activeHive.beekeeperId}
           onClose={() => setActiveHive(null)}
           onSubmit={async (payload) => {
             await addVisit(payload)
@@ -78,7 +79,7 @@ export default function PassagesPage() {
   )
 }
 
-function VisitCard({ hive, onLog }) {
+function VisitCard({ hive, showBeekeeper, onLog }) {
   const { echeance, dernierPassage } = hive
   const alerte = echeance.isDueSoon || echeance.isOverdue
 
@@ -100,7 +101,10 @@ function VisitCard({ hive, onLog }) {
         )}
         <div className="min-w-0">
           <p className="font-semibold text-ink-900 truncate">{hive.name}</p>
-          <p className="text-xs text-ink-900/50 truncate">{hive.site}</p>
+          <p className="text-xs text-ink-900/50 truncate">
+            {hive.site}
+            {showBeekeeper && ` · ${hive.beekeeperName || 'Aucun apiculteur assigné'}`}
+          </p>
           <p className="text-xs mt-1">
             {dernierPassage ? (
               <span className="text-ink-900/60">Dernier passage le {new Date(dernierPassage.visitDate).toLocaleDateString('fr-FR')}</span>

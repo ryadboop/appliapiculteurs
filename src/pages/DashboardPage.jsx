@@ -64,7 +64,7 @@ export default function DashboardPage() {
         </span>
         <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
         <div className="ml-auto flex items-center gap-1">
-          {myBeekeeperId && (
+          {(myBeekeeperId || isAdmin) && (
             <Link to="/passages" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
               <CalendarIcon className="w-4 h-4" /> Passages
             </Link>
