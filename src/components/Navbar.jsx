@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import izigreenLogo from '../assets/izigreen-logo.png'
 
@@ -7,14 +8,24 @@ function NavLink({ to, children, icon }) {
   const active = pathname === to
 
   return (
-    <Link
-      to={to}
-      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
-        active ? 'bg-forest-800 text-white' : 'text-ink-900/60 hover:text-ink-900 hover:bg-white/60'
-      }`}
-    >
-      {icon}
-      {children}
+    <Link to={to} className="relative">
+      <motion.span
+        whileHover={{ scale: active ? 1 : 1.04 }}
+        whileTap={{ scale: 0.97 }}
+        className={`relative z-10 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+          active ? 'text-white' : 'text-ink-900/60 hover:text-ink-900'
+        }`}
+      >
+        {icon}
+        {children}
+      </motion.span>
+      {active && (
+        <motion.span
+          layoutId="nav-active-pill"
+          className="absolute inset-0 rounded-xl bg-forest-800"
+          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+        />
+      )}
     </Link>
   )
 }
@@ -23,18 +34,27 @@ export default function Navbar() {
   const { isAdmin, myBeekeeperId, signOut } = useAuth()
 
   return (
-    <header className="sticky top-0 z-30">
-      <nav
-        className="mx-auto max-w-6xl flex items-center gap-1 px-4 py-2.5 sm:px-6"
-        style={{
-          background: 'rgba(255,255,255,0.72)',
-          backdropFilter: 'blur(18px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-          borderBottom: '1px solid color-mix(in srgb, white 60%, var(--color-forest-100))',
-        }}
-      >
+    <motion.header
+      initial={{ opacity: 0, y: -16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="sticky top-0 z-30 w-full"
+      style={{
+        background: 'color-mix(in srgb, white 62%, transparent)',
+        backdropFilter: 'blur(20px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+        borderBottom: '1px solid color-mix(in srgb, white 50%, var(--color-forest-100))',
+        boxShadow: '0 8px 30px -18px rgba(20,67,43,0.35)',
+      }}
+    >
+      <nav className="mx-auto max-w-6xl flex items-center gap-1 px-4 py-2.5 sm:px-6">
         <Link to="/" className="flex items-center gap-2 pr-2 shrink-0">
-          <img src={izigreenLogo} alt="izigreen" className="h-5 w-auto" />
+          <motion.img
+            whileHover={{ scale: 1.04 }}
+            src={izigreenLogo}
+            alt="izigreen"
+            className="h-5 w-auto"
+          />
         </Link>
 
         <span className="w-px h-5 bg-forest-800/10 mx-1 shrink-0" />
@@ -61,16 +81,18 @@ export default function Navbar() {
               Admin
             </NavLink>
           )}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
             onClick={signOut}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-ink-900/60 hover:text-ink-900 hover:bg-white/60 transition"
+            className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium text-ink-900/60 hover:text-ink-900 hover:bg-white/60 transition-colors duration-200"
           >
             <LogoutIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Se déconnecter</span>
-          </button>
+          </motion.button>
         </div>
       </nav>
-    </header>
+    </motion.header>
   )
 }
 
