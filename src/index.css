@@ -67,4 +67,12 @@
   .gradient-honey {
     background-image: linear-gradient(135deg, var(--color-honey-400), var(--color-honey-600));
   }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

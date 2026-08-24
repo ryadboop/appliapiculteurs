@@ -59,7 +59,7 @@ export default function Navbar() {
 
         <span className="w-px h-5 bg-forest-800/10 mx-1 shrink-0" />
 
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           <NavLink to="/" icon={<HiveIcon className="w-4 h-4" />}>
             Suivi des ruches
           </NavLink>
