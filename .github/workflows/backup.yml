@@ -31,7 +31,7 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           mkdir -p backups
-          pg_dump "$DATABASE_URL" --schema=public --no-owner --no-privileges --clean --if-exists \
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" --schema=public --no-owner --no-privileges --clean --if-exists \
             > "backups/$(date -u +%F).sql"
 
       - name: Ne garder que les 14 dernières sauvegardes
