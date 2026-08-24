@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useBeekeepers } from '../hooks/useBeekeepers'
 import { useHives } from '../hooks/useHives'
 import { useHiveVisits } from '../hooks/useHiveVisits'
+import { useAuditLog } from '../hooks/useAuditLog'
 import { downloadCsv, dateStamp } from '../lib/csv'
 import { placementLabel, shareRoleLabel, statusLabel } from '../lib/hives'
 
@@ -10,6 +11,8 @@ export default function AdminPage() {
   const { beekeepers, loading, addBeekeeper, removeBeekeeper } = useBeekeepers()
   const { hives } = useHives()
   const { visits } = useHiveVisits()
+  const { entries: auditEntries, loading: auditLoading, restoreHive } = useAuditLog()
+  const [restoring, setRestoring] = useState(null)
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -103,6 +106,19 @@ export default function AdminPage() {
       await removeBeekeeper(b.id)
     } catch {
       setError("Suppression impossible — cet apiculteur est peut-être encore assigné à des ruchers.")
+    }
+  }
+
+  const doRestore = async (entry) => {
+    if (!window.confirm(`Restaurer le rucher "${entry.label}" ? Attention : ses passages/animations antérieurs à la suppression ne sont pas récupérés automatiquement.`))
+      return
+    setRestoring(entry.id)
+    try {
+      await restoreHive(entry.oldData)
+    } catch (err) {
+      alert('Restauration impossible : ' + err.message)
+    } finally {
+      setRestoring(null)
     }
   }
 
@@ -203,6 +219,56 @@ export default function AdminPage() {
           En attendant, crée les comptes depuis Supabase (Authentication &gt; Users), puis lie chacun à son profil
           apiculteur avec une ligne SQL — je te la donne quand tu es prêt à créer les premiers accès.
         </p>
+      </section>
+
+      <section className="glass-card mt-5 rounded-3xl p-6">
+        <h2 className="text-lg font-semibold text-ink-900" style={{ fontFamily: 'var(--font-display)' }}>
+          Journal des modifications
+        </h2>
+        <p className="mt-1 text-sm text-ink-900/50">
+          Qui a créé, modifié ou supprimé quoi, et quand. Les 150 dernières actions.
+        </p>
+
+        <div className="mt-4 divide-y divide-forest-800/8 rounded-2xl border border-forest-800/10 max-h-[480px] overflow-y-auto">
+          {auditLoading && <p className="px-4 py-6 text-center text-sm text-ink-900/40">Chargement…</p>}
+          {!auditLoading && auditEntries.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-ink-900/40">Aucune action enregistrée pour le moment.</p>
+          )}
+          {auditEntries.map((entry) => (
+            <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm text-ink-900">
+                  <span
+                    className={`inline-block mr-2 px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase ${
+                      entry.action === 'insert'
+                        ? 'bg-forest-100 text-forest-800'
+                        : entry.action === 'delete'
+                          ? 'bg-red-50 text-red-600'
+                          : 'bg-honey-100 text-honey-600'
+                    }`}
+                  >
+                    {entry.actionLabel}
+                  </span>
+                  <span className="font-medium">{entry.tableLabel}</span> · {entry.label}
+                </p>
+                <p className="text-xs text-ink-900/40 mt-0.5">
+                  {new Date(entry.changedAt).toLocaleString('fr-FR')}
+                  {entry.changedByEmail && ` · ${entry.changedByEmail}`}
+                  {entry.changedFields.length > 0 && ` · champs modifiés : ${entry.changedFields.join(', ')}`}
+                </p>
+              </div>
+              {entry.action === 'delete' && entry.tableName === 'hives' && (
+                <button
+                  onClick={() => doRestore(entry)}
+                  disabled={restoring === entry.id}
+                  className="shrink-0 rounded-xl bg-forest-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-700 transition disabled:opacity-50"
+                >
+                  {restoring === entry.id ? 'Restauration…' : 'Restaurer'}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
       </section>
     </main>
   )
