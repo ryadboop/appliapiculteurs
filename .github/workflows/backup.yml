@@ -1,9 +1,9 @@
-name: Sauvegarde quotidienne Supabase
+name: Sauvegarde hebdomadaire Supabase
 
 on:
   schedule:
-    # Tous les jours à 3h UTC (4h ou 5h en France selon l'heure d'été)
-    - cron: '0 3 * * *'
+    # Tous les dimanches à 3h UTC (4h ou 5h en France selon l'heure d'été)
+    - cron: '0 3 * * 0'
   workflow_dispatch: {} # permet aussi de la lancer manuellement depuis l'onglet Actions
 
 permissions:

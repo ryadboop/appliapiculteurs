@@ -24,7 +24,7 @@ base de données.
 ✅ Installable sur téléphone (PWA), mise à jour automatique sans réinstallation
 ✅ Journal d'audit (qui a créé/modifié/supprimé quoi, et quand), restauration
    d'un rucher supprimé
-✅ Sauvegarde quotidienne automatique de la base (GitHub Actions, gratuite)
+✅ Sauvegarde hebdomadaire automatique de la base (GitHub Actions, gratuite)
 
 🔜 À venir : l'espace admin (`/admin`) est pour l'instant un écran d'attente.
    La création/suppression de comptes utilisateurs directement depuis l'appli
@@ -76,7 +76,7 @@ côté hébergeur. Chaque `git push` redéploie automatiquement.
 `public/icon-192.png` et `public/icon-512.png` sont provisoires — à
 remplacer par le logo IziGreen si besoin, mêmes noms de fichiers.
 
-### Activer la sauvegarde automatique quotidienne
+### Activer la sauvegarde automatique hebdomadaire
 
 Le workflow existe déjà (`.github/workflows/backup.yml`), il ne manque
 qu'une information secrète pour qu'il puisse se connecter à la base :
@@ -90,11 +90,12 @@ qu'une information secrète pour qu'il puisse se connecter à la base :
    Nom : `SUPABASE_DB_URL`. Valeur : la chaîne de connexion complète
    (avec le mot de passe dedans, à la place de `[YOUR-PASSWORD]`).
 3. C'est tout. La sauvegarde tourne chaque nuit automatiquement, et garde
-   les 14 derniers jours dans le dossier `backups/` du repo (les plus
+   les 14 dernières sauvegardes (soit environ 3,5 mois d'historique au
+   rythme hebdomadaire) dans le dossier `backups/` du repo (les plus
    anciennes sont supprimées automatiquement).
 
 Pour tester tout de suite sans attendre la nuit : onglet **Actions** du
-repo > "Sauvegarde quotidienne Supabase" > **Run workflow**.
+repo > "Sauvegarde hebdomadaire Supabase" > **Run workflow**.
 
 Ces sauvegardes couvrent uniquement les données de l'appli (`public`),
 pas les comptes/mots de passe (gérés par Supabase lui-même).
