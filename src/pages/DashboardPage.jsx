@@ -10,6 +10,7 @@ import AnimatedNumber from '../components/AnimatedNumber'
 import AddHiveDialog from '../components/AddHiveDialog'
 import HiveTable from '../components/HiveTable'
 import HiveDetailDialog from '../components/HiveDetailDialog'
+import izigreenLogo from '../assets/izigreen-logo.png'
 
 const FILTERS = [
   { id: 'all', label: 'Toutes' },
@@ -59,8 +60,7 @@ export default function DashboardPage() {
     <main className="mx-auto w-full max-w-6xl px-5 py-10 md:px-8 md:py-14">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="mb-8 flex items-center gap-3">
         <span className="relative inline-block font-bold text-forest-800 text-lg">
-          izigreen
-          <CheckBadge />
+          <img src={izigreenLogo} alt="izigreen" className="h-6 w-auto" />
         </span>
         <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
         <div className="ml-auto flex items-center gap-1">
@@ -166,14 +166,6 @@ export default function DashboardPage() {
   )
 }
 
-function CheckBadge() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" className="absolute -top-1 -right-3.5 fill-honey-500">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M8 12.5l2.5 2.5L16 9" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 function HexIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
