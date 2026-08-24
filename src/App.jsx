@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import Navbar from './components/Navbar'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import HistoriquePage from './pages/HistoriquePage'
@@ -23,13 +24,16 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<DashboardPage />} />
-      <Route path="/historique" element={<HistoriquePage />} />
-      <Route path="/admin" element={<AdminPage />} />
-      <Route path="/passages" element={<PassagesPage />} />
-      <Route path="/animations" element={<AnimationsPage />} />
-      <Route path="*" element={<DashboardPage />} />
-    </Routes>
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/historique" element={<HistoriquePage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/passages" element={<PassagesPage />} />
+        <Route path="/animations" element={<AnimationsPage />} />
+        <Route path="*" element={<DashboardPage />} />
+      </Routes>
+    </>
   )
 }

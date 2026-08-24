@@ -10,7 +10,6 @@ import AnimatedNumber from '../components/AnimatedNumber'
 import AddHiveDialog from '../components/AddHiveDialog'
 import HiveTable from '../components/HiveTable'
 import HiveDetailDialog from '../components/HiveDetailDialog'
-import izigreenLogo from '../assets/izigreen-logo.png'
 
 const FILTERS = [
   { id: 'all', label: 'Toutes' },
@@ -20,7 +19,7 @@ const FILTERS = [
 ]
 
 export default function DashboardPage() {
-  const { isAdmin, myBeekeeperId, signOut } = useAuth()
+  const { isAdmin, myBeekeeperId } = useAuth()
   const { hives: hivesRaw, loading, error, addHive, updateHive, removeHive } = useHives()
   const [filter, setFilter] = useState('all')
   const [selectedId, setSelectedId] = useState(null)
@@ -58,33 +57,6 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-10 md:px-8 md:py-14">
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="mb-8 flex items-center gap-3">
-        <span className="relative inline-block font-bold text-forest-800 text-lg">
-          <img src={izigreenLogo} alt="izigreen" className="h-6 w-auto" />
-        </span>
-        <span className="font-bold text-ink-900 text-lg">Suivi des ruches</span>
-        <div className="ml-auto flex items-center gap-1">
-          {(myBeekeeperId || isAdmin) && (
-            <Link to="/passages" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
-              <CalendarIcon className="w-4 h-4" /> Passages
-            </Link>
-          )}
-          {isAdmin && (
-            <Link to="/animations" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
-              <SparkleIcon className="w-4 h-4" /> Animation
-            </Link>
-          )}
-          {isAdmin && (
-            <Link to="/admin" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
-              <ShieldIcon className="w-4 h-4" /> Admin
-            </Link>
-          )}
-          <button onClick={signOut} className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
-            <LogoutIcon className="w-4 h-4" /> Se déconnecter
-          </button>
-        </div>
-      </motion.div>
-
       <motion.header
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -209,37 +181,6 @@ function LeafIcon(props) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M11 20A7 7 0 0 1 4 13V6a1 1 0 0 1 1-1h7a7 7 0 0 1 7 7 7 7 0 0 1-7 7Z" />
       <path d="M4 20l6-6" />
-    </svg>
-  )
-}
-function ShieldIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-    </svg>
-  )
-}
-function CalendarIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  )
-}
-function SparkleIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
-    </svg>
-  )
-}
-function LogoutIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   )
 }

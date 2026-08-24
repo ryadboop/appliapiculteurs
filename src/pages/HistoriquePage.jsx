@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { useHives } from '../hooks/useHives'
@@ -43,10 +42,7 @@ export default function HistoriquePage() {
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
       <motion.header initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <Link to="/" className="inline-flex items-center gap-1.5 -ml-2 rounded-xl px-2 py-1 text-sm text-ink-900/50 hover:text-ink-900 transition">
-          <ArrowLeftIcon className="w-4 h-4" /> Dashboard
-        </Link>
-        <h1 className="mt-2 text-4xl font-semibold text-ink-900 md:text-5xl" style={{ fontFamily: 'var(--font-display)' }}>
+        <h1 className="text-4xl font-semibold text-ink-900 md:text-5xl" style={{ fontFamily: 'var(--font-display)' }}>
           Historique annuel
         </h1>
         <p className="mt-2 max-w-xl text-sm text-ink-900/50">
@@ -136,13 +132,6 @@ export default function HistoriquePage() {
   )
 }
 
-function ArrowLeftIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M19 12H5M12 19l-7-7 7-7" />
-    </svg>
-  )
-}
 function DownloadIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
