@@ -4,32 +4,25 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { useHives } from '../hooks/useHives'
 import { formatEuro, placementLabel } from '../lib/hives'
-
-function archiveToCsv(year, hives) {
-  const head = ['Rucher', 'Client', 'Commune', 'Région', 'Implantation', 'Apiculteur', 'Ruches', 'CA annuel (€ HT)', 'Début engagement', 'Statut']
-  const rows = hives.map((h) => [
-    h.name,
-    h.client,
-    h.site,
-    h.region,
-    placementLabel[h.placement],
-    h.beekeeperName ?? '',
-    String(h.hiveCount),
-    String(h.revenue ?? ''),
-    h.startDate,
-    h.status,
-  ])
-  return [head, ...rows].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n')
-}
+import { downloadCsv } from '../lib/csv'
 
 function downloadArchive(year, hives) {
-  const blob = new Blob(['\uFEFF' + archiveToCsv(year, hives)], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `izigreen-ruchers-${year}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadCsv(
+    `izigreen-ruchers-${year}.csv`,
+    ['Rucher', 'Client', 'Commune', 'Région', 'Implantation', 'Apiculteur', 'Ruches', 'CA annuel (€ HT)', 'Début engagement', 'Statut'],
+    hives.map((h) => [
+      h.name,
+      h.client,
+      h.site,
+      h.region,
+      placementLabel[h.placement],
+      h.beekeeperName ?? '',
+      h.hiveCount,
+      h.revenue ?? '',
+      h.startDate,
+      h.status,
+    ])
+  )
 }
 
 export default function HistoriquePage() {

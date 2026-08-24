@@ -2,12 +2,86 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useBeekeepers } from '../hooks/useBeekeepers'
+import { useHives } from '../hooks/useHives'
+import { useHiveVisits } from '../hooks/useHiveVisits'
+import { downloadCsv, dateStamp } from '../lib/csv'
+import { placementLabel, shareRoleLabel, statusLabel } from '../lib/hives'
 
 export default function AdminPage() {
   const { beekeepers, loading, addBeekeeper, removeBeekeeper } = useBeekeepers()
+  const { hives } = useHives()
+  const { visits } = useHiveVisits()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  const exportRuchers = () => {
+    downloadCsv(
+      `izigreen-ruchers-${dateStamp()}.csv`,
+      [
+        'Nom du rucher',
+        'Client',
+        'Commune / Ville',
+        'Région',
+        'Implantation',
+        'Adresse exacte',
+        'Apiculteur',
+        'Nombre de ruches',
+        'CA annuel (€ HT)',
+        'Statut',
+        "Rôle rucher partagé",
+        'Rucher hôte lié',
+        'Latitude',
+        'Longitude',
+        "Date d'installation",
+        "Fin d'engagement (3 ans)",
+      ],
+      hives.map((h) => {
+        const finEngagement = new Date(h.startDate)
+        finEngagement.setFullYear(finEngagement.getFullYear() + 3)
+        const hote = hives.find((x) => x.id === h.hostHiveId)
+        return [
+          h.name,
+          h.client,
+          h.site,
+          h.region,
+          placementLabel[h.placement],
+          h.placementDetail,
+          h.beekeeperName ?? '',
+          h.hiveCount,
+          h.revenue ?? '',
+          statusLabel[h.status],
+          shareRoleLabel[h.shareRole || ''],
+          hote?.name ?? '',
+          h.latitude ?? '',
+          h.longitude ?? '',
+          h.startDate,
+          finEngagement.toISOString().slice(0, 10),
+        ]
+      })
+    )
+  }
+
+  const exportPassages = () => {
+    const parHive = Object.fromEntries(hives.map((h) => [h.id, h]))
+    downloadCsv(
+      `izigreen-passages-${dateStamp()}.csv`,
+      ['Rucher', 'Client', 'Commune / Ville', 'Apiculteur', 'Date du passage', 'Note', 'Lien photo', 'Enregistré le'],
+      visits.map((v) => {
+        const h = parHive[v.hiveId]
+        return [
+          h?.name ?? '',
+          h?.client ?? '',
+          h?.site ?? '',
+          h?.beekeeperName ?? '',
+          v.visitDate,
+          v.note ?? '',
+          v.photoUrl ?? '',
+          new Date(v.createdAt).toLocaleString('fr-FR'),
+        ]
+      })
+    )
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -43,6 +117,31 @@ export default function AdminPage() {
       </h1>
 
       <section className="glass-card mt-8 rounded-3xl p-6">
+        <h2 className="text-lg font-semibold text-ink-900" style={{ fontFamily: 'var(--font-display)' }}>
+          Exports
+        </h2>
+        <p className="mt-1 text-sm text-ink-900/50">
+          Fichiers CSV complets, prêts pour Excel/Sheets (accents corrects, colonnes numériques exploitables).
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            onClick={exportRuchers}
+            className="flex items-center gap-2 rounded-2xl bg-forest-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-forest-700 transition"
+          >
+            <DownloadIcon className="w-4 h-4" />
+            Exporter les ruchers ({hives.length})
+          </button>
+          <button
+            onClick={exportPassages}
+            className="flex items-center gap-2 rounded-2xl bg-honey-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-honey-600 transition"
+          >
+            <DownloadIcon className="w-4 h-4" />
+            Exporter les passages ({visits.length})
+          </button>
+        </div>
+      </section>
+
+      <section className="glass-card mt-5 rounded-3xl p-6">
         <h2 className="text-lg font-semibold text-ink-900" style={{ fontFamily: 'var(--font-display)' }}>
           Apiculteurs partenaires
         </h2>
@@ -131,6 +230,13 @@ function TrashIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z" />
+    </svg>
+  )
+}
+function DownloadIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   )
 }
