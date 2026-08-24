@@ -70,6 +70,11 @@ export default function DashboardPage() {
             </Link>
           )}
           {isAdmin && (
+            <Link to="/animations" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
+              <SparkleIcon className="w-4 h-4" /> Animation
+            </Link>
+          )}
+          {isAdmin && (
             <Link to="/admin" className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm text-ink-900/50 hover:text-ink-900 hover:bg-white/50 transition">
               <ShieldIcon className="w-4 h-4" /> Admin
             </Link>
@@ -219,6 +224,13 @@ function CalendarIcon(props) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  )
+}
+function SparkleIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
     </svg>
   )
 }

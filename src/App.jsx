@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage'
 import HistoriquePage from './pages/HistoriquePage'
 import AdminPage from './pages/AdminPage'
 import PassagesPage from './pages/PassagesPage'
+import AnimationsPage from './pages/AnimationsPage'
 
 export default function App() {
   const { session, loading } = useAuth()
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/historique" element={<HistoriquePage />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/passages" element={<PassagesPage />} />
+      <Route path="/animations" element={<AnimationsPage />} />
       <Route path="*" element={<DashboardPage />} />
     </Routes>
   )
