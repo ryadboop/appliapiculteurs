@@ -119,3 +119,21 @@ export function formatCoords(lat, lng) {
   if (lat == null || lng == null) return null
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
 }
+
+/**
+ * Passages mensuels : calcule la prochaine échéance (1 mois après le
+ * dernier passage validé, ou après l'installation si jamais visité), et si
+ * elle doit être signalée (rouge dans les 3 jours avant, ou en retard).
+ */
+export function nextVisitDue(lastVisitDate, hiveStartDate, now = today()) {
+  const base = lastVisitDate ? new Date(lastVisitDate) : new Date(hiveStartDate)
+  const due = new Date(base)
+  due.setMonth(due.getMonth() + 1)
+  const joursRestants = Math.round((due.getTime() - now.getTime()) / DAY_MS)
+  return {
+    dueDate: due,
+    daysUntilDue: joursRestants,
+    isDueSoon: joursRestants <= 3 && joursRestants >= 0,
+    isOverdue: joursRestants < 0,
+  }
+}
