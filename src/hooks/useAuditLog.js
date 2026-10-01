@@ -30,7 +30,7 @@ const FIELD_LABEL = {
   latitude: 'latitude',
   longitude: 'longitude',
   price: 'prix',
-  visit_date: 'date du passage',
+  visited_at: 'date et heure du passage',
   animation_date: "date de l'animation",
   location_type: 'lieu',
   custom_address: 'adresse',
@@ -43,7 +43,7 @@ function recordLabel(tableName, data) {
   if (!data) return '—'
   if (tableName === 'hives' || tableName === 'beekeepers') return data.name
   if (tableName === 'animations') return `Animation du ${data.animation_date}`
-  if (tableName === 'hive_visits') return `Passage du ${data.visit_date}`
+  if (tableName === 'hive_visits') return `Passage du ${new Date(data.visited_at).toLocaleString('fr-FR')}`
   if (tableName === 'user_roles') return `Rôle ${data.role}`
   return data.id
 }
