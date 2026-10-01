@@ -115,6 +115,23 @@ export function formatEuro(value) {
   }).format(value ?? 0)
 }
 
+/** Normalise une chaîne pour une recherche insensible aux accents/casse. */
+export function normalizeSearch(text) {
+  return (text ?? '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+/** Un rucher correspond-il à la recherche (nom du rucher ou du client) ? */
+export function hiveMatchesSearch(hive, query) {
+  const q = normalizeSearch(query)
+  if (!q) return true
+  return normalizeSearch(hive.name).includes(q) || normalizeSearch(hive.client).includes(q) || normalizeSearch(hive.site).includes(q)
+}
+
 export function formatCoords(lat, lng) {
   if (lat == null || lng == null) return null
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
