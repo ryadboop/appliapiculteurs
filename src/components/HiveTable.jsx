@@ -9,7 +9,7 @@ const statusStyles = {
   renewal: 'bg-honey-500 text-white',
 }
 
-export default function HiveTable({ hives, isAdmin, myBeekeeperId, onDelete, onSelect }) {
+export default function HiveTable({ hives, isAdmin, myBeekeeperId, onDelete, onSelect, emptyMessage }) {
   const cols = isAdmin ? '1.6fr 1.2fr 1fr 1.4fr 0.9fr' : '1.6fr 1.2fr 1.4fr 0.9fr'
 
   return (
@@ -100,7 +100,7 @@ export default function HiveTable({ hives, isAdmin, myBeekeeperId, onDelete, onS
 
         {hives.length === 0 && (
           <p className="px-6 py-14 text-center text-sm text-ink-900/50">
-            Aucune ruche pour le moment · ajoutez votre première ruche pour démarrer.
+            {emptyMessage || 'Aucune ruche pour le moment · ajoutez votre première ruche pour démarrer.'}
           </p>
         )}
       </div>

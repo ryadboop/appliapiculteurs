@@ -15,13 +15,12 @@ import {
 } from '../lib/hives'
 
 const steps = [
-  { title: 'Le rucher', subtitle: 'Identité & nombre de ruches' },
-  { title: "L'implantation", subtitle: 'Client & lieu d\u2019installation' },
+  { title: 'Le client', subtitle: 'Nom du client & nombre de ruches' },
+  { title: "L'implantation", subtitle: "Lieu d'installation" },
   { title: "L'engagement", subtitle: 'Contrat 3 ans' },
 ]
 
 const emptyForm = {
-  name: '',
   site: '',
   client: '',
   region: REGIONS[0],
@@ -93,8 +92,8 @@ export default function AddHiveDialog({ onCreate, hives }) {
   }
 
   const canContinue =
-    (step === 0 && form.name.trim().length > 1) ||
-    (step === 1 && form.client.trim().length > 1 && form.site.trim().length > 1 && coordsValid && shareValid) ||
+    (step === 0 && form.client.trim().length > 1) ||
+    (step === 1 && form.site.trim().length > 1 && coordsValid && shareValid) ||
     (step === 2 && priceValid)
 
   const reset = () => {
@@ -111,7 +110,7 @@ export default function AddHiveDialog({ onCreate, hives }) {
   const submit = () => {
     if (!coordsValid || !priceValid || !shareValid) return
     onCreate({
-      name: form.name.trim(),
+      name: form.client.trim(),
       site: form.site.trim(),
       client: form.client.trim(),
       region: form.region,
@@ -188,14 +187,17 @@ export default function AddHiveDialog({ onCreate, hives }) {
               {step === 0 && (
                 <>
                   <div>
-                    <label className={labelClass}>Nom du rucher</label>
+                    <label className={labelClass}>Client</label>
                     <input
                       autoFocus
-                      placeholder="Rucher des Tilleuls"
-                      value={form.name}
-                      onChange={(e) => set('name', e.target.value)}
+                      placeholder="Groupe Verdier"
+                      value={form.client}
+                      onChange={(e) => set('client', e.target.value)}
                       className={inputClass}
                     />
+                    <p className="text-xs text-ink-900/50 mt-1">
+                      Le nom du rucher pourra être renseigné plus tard depuis sa fiche détaillée.
+                    </p>
                   </div>
                   <div>
                     <label className={labelClass}>Nombre de ruches installées · {form.hiveCount}</label>
@@ -218,17 +220,6 @@ export default function AddHiveDialog({ onCreate, hives }) {
 
               {step === 1 && (
                 <>
-                  <div>
-                    <label className={labelClass}>Client</label>
-                    <input
-                      autoFocus
-                      placeholder="Groupe Verdier"
-                      value={form.client}
-                      onChange={(e) => set('client', e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-
                   <div>
                     <label className={labelClass}>Lieu d'installation</label>
                     <div className="grid grid-cols-3 gap-2">
