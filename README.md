@@ -12,13 +12,17 @@ base de données.
 ## État actuel
 
 ✅ Authentification, rôles admin / utilisateur (table `user_roles`)
-✅ Dashboard : KPIs, filtres par statut, tableau des ruchers
-✅ Formulaire d'ajout en 3 étapes (identité, implantation, engagement) avec
+✅ Dashboard : KPIs, recherche, filtres par statut, tableau des ruchers
+✅ Formulaire d'ajout en 3 étapes (client, implantation, engagement) avec
    géolocalisation, aperçu carte, rucher partagé hôte/hébergé, prix personnalisé
+   — le nom du rucher lui-même se renseigne plus tard, depuis sa fiche
 ✅ Vue détaillée d'un rucher, éditable par les admins uniquement
 ✅ Suppression avec avertissement si l'engagement 3 ans n'est pas terminé
 ✅ Historique par année (calculé dynamiquement, pas de tâche planifiée),
-   export CSV
+   recherche, export CSV
+✅ Passages mensuels (admin + apiculteurs) : recherche d'un rucher/client,
+   photo et commentaire obligatoires pour valider, date ET heure enregistrées
+   automatiquement au moment de la validation
 ✅ Confettis à la création d'une ruche, compteurs animés, anneau de progression
    de l'engagement
 ✅ Installable sur téléphone (PWA), mise à jour automatique sans réinstallation
@@ -99,3 +103,12 @@ repo > "Sauvegarde hebdomadaire Supabase" > **Run workflow**.
 
 Ces sauvegardes couvrent uniquement les données de l'appli (`public`),
 pas les comptes/mots de passe (gérés par Supabase lui-même).
+
+### Migration à appliquer : passages avec date ET heure automatiques
+
+`supabase/migration_006_visit_timestamp.sql` est à coller une fois dans
+Supabase > SQL Editor > New query > Run, sur le projet déjà en ligne (après
+les migrations 002 à 005 déjà appliquées). Elle renomme la colonne
+`hive_visits.visit_date` (date) en `visited_at` (timestamptz, défaut
+`now()`), pour que chaque passage enregistre désormais la date **et**
+l'heure exactes au moment de la validation, sans saisie manuelle.
