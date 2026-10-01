@@ -4,24 +4,30 @@ import { useAuth } from '../hooks/useAuth'
 import { useHives } from '../hooks/useHives'
 import { useHiveVisits } from '../hooks/useHiveVisits'
 import Modal from '../components/Modal'
-import { nextVisitDue } from '../lib/hives'
+import { hiveMatchesSearch, nextVisitDue } from '../lib/hives'
 
 export default function PassagesPage() {
   const { myBeekeeperId, isAdmin } = useAuth()
   const { hives, loading: hivesLoading } = useHives()
   const { lastVisitByHive, addVisit } = useHiveVisits()
   const [activeHive, setActiveHive] = useState(null)
+  const [search, setSearch] = useState('')
 
   const ruchersAffiches = useMemo(() => {
     const base = isAdmin ? hives : hives.filter((h) => h.beekeeperId === myBeekeeperId)
     return base
       .map((h) => {
         const dernier = lastVisitByHive[h.id]
-        const echeance = nextVisitDue(dernier?.visitDate, h.startDate)
+        const echeance = nextVisitDue(dernier?.visitedAt, h.startDate)
         return { ...h, dernierPassage: dernier, echeance }
       })
       .sort((a, b) => a.echeance.daysUntilDue - b.echeance.daysUntilDue)
   }, [hives, isAdmin, myBeekeeperId, lastVisitByHive])
+
+  const ruchersFiltres = useMemo(
+    () => ruchersAffiches.filter((h) => hiveMatchesSearch(h, search)),
+    [ruchersAffiches, search]
+  )
 
   if (!hivesLoading && !myBeekeeperId && !isAdmin) {
     return (
@@ -45,14 +51,31 @@ export default function PassagesPage() {
           : "Un passage par mois et par rucher. Une alerte apparaît 3 jours avant l'échéance."}
       </p>
 
-      <div className="mt-8 space-y-3">
+      {ruchersAffiches.length > 0 && (
+        <div className="relative mt-6">
+          <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-900/30" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un rucher ou un client…"
+            className="h-11 w-full rounded-2xl border border-forest-100 bg-white/70 pl-10 pr-3.5 text-sm text-ink-900 outline-none transition focus:ring-2 focus:ring-honey-400 focus:border-honey-400"
+          />
+        </div>
+      )}
+
+      <div className="mt-6 space-y-3">
         {hivesLoading && <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">Chargement…</div>}
         {!hivesLoading && ruchersAffiches.length === 0 && (
           <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">
             {isAdmin ? 'Aucun rucher enregistré pour le moment.' : "Aucun rucher ne t'est encore assigné."}
           </div>
         )}
-        {ruchersAffiches.map((h) => (
+        {!hivesLoading && ruchersAffiches.length > 0 && ruchersFiltres.length === 0 && (
+          <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-ink-900/40">
+            Aucun rucher ne correspond à « {search} ».
+          </div>
+        )}
+        {ruchersFiltres.map((h) => (
           <VisitCard key={h.id} hive={h} showBeekeeper={isAdmin} onLog={() => setActiveHive(h)} />
         ))}
       </div>
@@ -100,7 +123,11 @@ function VisitCard({ hive, showBeekeeper, onLog }) {
           </p>
           <p className="text-xs mt-1">
             {dernierPassage ? (
-              <span className="text-ink-900/60">Dernier passage le {new Date(dernierPassage.visitDate).toLocaleDateString('fr-FR')}</span>
+              <span className="text-ink-900/60">
+                Dernier passage le{' '}
+                {new Date(dernierPassage.visitedAt).toLocaleDateString('fr-FR')} à{' '}
+                {new Date(dernierPassage.visitedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             ) : (
               <span className="text-ink-900/40">Aucun passage enregistré</span>
             )}
@@ -119,7 +146,7 @@ function VisitCard({ hive, showBeekeeper, onLog }) {
           onClick={onLog}
           className="rounded-xl bg-forest-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-forest-700 transition"
         >
-          Enregistrer un passage
+          Passage mensuel
         </button>
       </div>
     </motion.div>
@@ -136,12 +163,13 @@ function AlertDot() {
 }
 
 function LogVisitModal({ hive, beekeeperId, onClose, onSubmit }) {
-  const [visitDate, setVisitDate] = useState(new Date().toISOString().slice(0, 10))
   const [photoFile, setPhotoFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  const canSubmit = Boolean(photoFile) && note.trim().length > 0 && !submitting
 
   const onPickPhoto = (e) => {
     const file = e.target.files?.[0]
@@ -152,10 +180,11 @@ function LogVisitModal({ hive, beekeeperId, onClose, onSubmit }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!canSubmit) return
     setSubmitting(true)
     setError(null)
     try {
-      await onSubmit({ hiveId: hive.id, beekeeperId, visitDate, photoFile, note })
+      await onSubmit({ hiveId: hive.id, beekeeperId, photoFile, note })
     } catch (err) {
       setError(err.message || "Impossible d'enregistrer ce passage.")
       setSubmitting(false)
@@ -168,23 +197,18 @@ function LogVisitModal({ hive, beekeeperId, onClose, onSubmit }) {
         <h3 className="text-lg font-semibold text-ink-900" style={{ fontFamily: 'var(--font-display)' }}>
           Passage · {hive.name}
         </h3>
-        <p className="text-sm text-ink-900/50 mt-0.5">{hive.site}</p>
+        <p className="text-sm text-ink-900/50 mt-0.5">
+          {hive.client} · {hive.site}
+        </p>
 
         <div className="mt-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-ink-900/80 mb-1.5">Date du passage</label>
-            <input
-              type="date"
-              required
-              max={new Date().toISOString().slice(0, 10)}
-              value={visitDate}
-              onChange={(e) => setVisitDate(e.target.value)}
-              className="h-11 w-full rounded-xl border border-forest-100 bg-cream-50 px-3.5 text-sm text-ink-900 outline-none focus:ring-2 focus:ring-honey-400 focus:border-honey-400 transition"
-            />
+          <div className="rounded-xl bg-cream-50 border border-forest-100 px-3.5 py-2.5 text-xs text-ink-900/50 flex items-center gap-2">
+            <ClockIcon className="w-4 h-4 text-forest-700 shrink-0" />
+            La date et l'heure du passage seront enregistrées automatiquement à la validation.
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink-900/80 mb-1.5">Photo des ruches (facultatif)</label>
+            <label className="block text-sm font-medium text-ink-900/80 mb-1.5">Photo de la ruche (obligatoire)</label>
             {preview ? (
               <div className="relative">
                 <img src={preview} alt="Aperçu" className="w-full h-40 object-cover rounded-xl" />
@@ -202,19 +226,20 @@ function LogVisitModal({ hive, beekeeperId, onClose, onSubmit }) {
             ) : (
               <label className="flex items-center justify-center gap-2 h-24 rounded-xl border-2 border-dashed border-forest-100 text-sm text-ink-900/50 cursor-pointer hover:border-honey-400 transition">
                 <CameraIcon className="w-5 h-5" />
-                Ajouter une photo
+                Prendre ou ajouter une photo
                 <input type="file" accept="image/*" capture="environment" onChange={onPickPhoto} className="hidden" />
               </label>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink-900/80 mb-1.5">Note (facultatif)</label>
+            <label className="block text-sm font-medium text-ink-900/80 mb-1.5">Commentaire sur la ruche (obligatoire)</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
-              placeholder="Observation particulière…"
+              required
+              placeholder="État de la ruche, observations…"
               className="w-full rounded-xl border border-forest-100 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:ring-2 focus:ring-honey-400 focus:border-honey-400 transition resize-none"
             />
           </div>
@@ -228,7 +253,7 @@ function LogVisitModal({ hive, beekeeperId, onClose, onSubmit }) {
           </button>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={!canSubmit}
             className="rounded-xl bg-honey-500 px-4 py-2 text-sm font-semibold text-white hover:bg-honey-600 transition disabled:opacity-50"
           >
             {submitting ? 'Enregistrement…' : 'Valider le passage'}
@@ -251,6 +276,22 @@ function CameraIcon(props) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
       <circle cx="12" cy="13" r="4" />
+    </svg>
+  )
+}
+function SearchIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  )
+}
+function ClockIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
     </svg>
   )
 }

@@ -68,7 +68,7 @@ export default function AdminPage() {
     const parHive = Object.fromEntries(hives.map((h) => [h.id, h]))
     downloadCsv(
       `izigreen-passages-${dateStamp()}.csv`,
-      ['Rucher', 'Client', 'Commune / Ville', 'Apiculteur', 'Date du passage', 'Note', 'Lien photo', 'Enregistré le'],
+      ['Rucher', 'Client', 'Commune / Ville', 'Apiculteur', 'Date et heure du passage', 'Commentaire', 'Lien photo'],
       visits.map((v) => {
         const h = parHive[v.hiveId]
         return [
@@ -76,10 +76,9 @@ export default function AdminPage() {
           h?.client ?? '',
           h?.site ?? '',
           h?.beekeeperName ?? '',
-          v.visitDate,
+          new Date(v.visitedAt).toLocaleString('fr-FR'),
           v.note ?? '',
           v.photoUrl ?? '',
-          new Date(v.createdAt).toLocaleString('fr-FR'),
         ]
       })
     )

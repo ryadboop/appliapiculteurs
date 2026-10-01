@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { useHives } from '../hooks/useHives'
 import { celebrate } from '../lib/celebrate'
-import { formatEuro, statusLabel } from '../lib/hives'
+import { formatEuro, hiveMatchesSearch, statusLabel } from '../lib/hives'
 import KpiCard from '../components/KpiCard'
 import AnimatedNumber from '../components/AnimatedNumber'
 import AddHiveDialog from '../components/AddHiveDialog'
@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const { isAdmin, myBeekeeperId } = useAuth()
   const { hives: hivesRaw, loading, error, addHive, updateHive, removeHive } = useHives()
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const year = new Date().getFullYear()
 
@@ -34,7 +35,10 @@ export default function DashboardPage() {
     return [...miens, ...autres]
   }, [hivesRaw, myBeekeeperId])
 
-  const visible = useMemo(() => (filter === 'all' ? hives : hives.filter((h) => h.status === filter)), [hives, filter])
+  const visible = useMemo(() => {
+    const parStatut = filter === 'all' ? hives : hives.filter((h) => h.status === filter)
+    return parStatut.filter((h) => hiveMatchesSearch(h, search))
+  }, [hives, filter, search])
 
   // KPIs cumulatifs sur l'ensemble du portefeuille actif (pas juste les
   // nouvelles installations de l'année) — cohérent avec la logique réelle du
@@ -103,6 +107,23 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="relative"
+        >
+          <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-900/30" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un rucher ou un client…"
+            className="h-11 w-full rounded-2xl border border-forest-800/15 bg-white/70 pl-10 pr-3.5 text-sm text-ink-900 outline-none transition focus:ring-2 focus:ring-honey-400 focus:border-honey-400"
+          />
+        </motion.div>
+      </section>
+
+      <section className="mt-3">
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
           className="glass-card flex flex-wrap items-center gap-2 rounded-3xl p-3"
         >
@@ -132,7 +153,14 @@ export default function DashboardPage() {
         ) : error ? (
           <div className="glass-card rounded-3xl px-6 py-14 text-center text-sm text-red-600">{error}</div>
         ) : (
-          <HiveTable hives={visible} isAdmin={isAdmin} myBeekeeperId={myBeekeeperId} onDelete={handleDelete} onSelect={(h) => setSelectedId(h.id)} />
+          <HiveTable
+            hives={visible}
+            isAdmin={isAdmin}
+            myBeekeeperId={myBeekeeperId}
+            onDelete={handleDelete}
+            onSelect={(h) => setSelectedId(h.id)}
+            emptyMessage={search.trim() ? `Aucun rucher ne correspond à « ${search} ».` : undefined}
+          />
         )}
       </section>
 
@@ -173,6 +201,14 @@ function ArchiveIcon(props) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2" y="4" width="20" height="5" rx="1" />
       <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9M10 13h4" />
+    </svg>
+  )
+}
+function SearchIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
     </svg>
   )
 }

@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { useHives } from '../hooks/useHives'
-import { formatEuro, placementLabel } from '../lib/hives'
+import { formatEuro, hiveMatchesSearch, placementLabel } from '../lib/hives'
 import { downloadCsv } from '../lib/csv'
 
 function downloadArchive(year, hives) {
@@ -28,16 +28,18 @@ export default function HistoriquePage() {
   const { isAdmin } = useAuth()
   const { hives, loading } = useHives()
   const currentYear = new Date().getFullYear()
+  const [search, setSearch] = useState('')
 
   const byYear = useMemo(() => {
     const map = new Map()
     for (const h of hives) {
       if (!h.startYear || h.startYear >= currentYear) continue
+      if (!hiveMatchesSearch(h, search)) continue
       if (!map.has(h.startYear)) map.set(h.startYear, [])
       map.get(h.startYear).push(h)
     }
     return Array.from(map.entries()).sort((a, b) => b[0] - a[0])
-  }, [hives, currentYear])
+  }, [hives, currentYear, search])
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 md:px-8 md:py-14">
@@ -51,14 +53,26 @@ export default function HistoriquePage() {
         </p>
       </motion.header>
 
-      <section className="mt-8 space-y-4">
+      <div className="relative mt-6">
+        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-900/30" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher un rucher ou un client…"
+          className="h-11 w-full max-w-md rounded-2xl border border-forest-800/15 bg-white/70 pl-10 pr-3.5 text-sm text-ink-900 outline-none transition focus:ring-2 focus:ring-honey-400 focus:border-honey-400"
+        />
+      </div>
+
+      <section className="mt-6 space-y-4">
         {!loading && byYear.length === 0 && (
           <div className="glass-card rounded-3xl px-6 py-16 text-center">
             <p className="text-xl font-semibold text-ink-900" style={{ fontFamily: 'var(--font-display)' }}>
-              Aucune année archivée pour l'instant
+              {search.trim() ? 'Aucun résultat' : "Aucune année archivée pour l'instant"}
             </p>
             <p className="mt-2 text-sm text-ink-900/50">
-              L'année {currentYear} est en cours : elle apparaîtra ici automatiquement à partir du {currentYear + 1}.
+              {search.trim()
+                ? `Aucun rucher archivé ne correspond à « ${search} ».`
+                : `L'année ${currentYear} est en cours : elle apparaîtra ici automatiquement à partir du ${currentYear + 1}.`}
             </p>
           </div>
         )}
@@ -136,6 +150,14 @@ function DownloadIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+    </svg>
+  )
+}
+function SearchIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
     </svg>
   )
 }
